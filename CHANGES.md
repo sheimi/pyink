@@ -4,7 +4,9 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-Nothing notable unreleased.
+* Prefer splitting right hand side of assignment statements
+  (see [psf/black#1498](https://github.com/psf/black/issues/1498), this is being
+  upstreamed in [psf/black/pull/3368](https://github.com/psf/black/pull/3368)).
 
 ## 22.10.0
 
