@@ -25,6 +25,7 @@ from typing import (
     List,
     Optional,
     Sequence,
+    Type,
     TypeVar,
     Union,
 )
@@ -152,6 +153,34 @@ class BlackTestCase(BlackBaseTestCase):
         finally:
             os.unlink(tmp_file)
         self.assertFormatEqual(expected, actual)
+
+    @patch("pyink.dump_to_file", dump_to_stderr)
+    def test_one_empty_line(self) -> None:
+        mode = pyink.Mode(preview=True)
+        for nl in ["\n", "\r\n"]:
+            source = expected = nl
+            assert_format(source, expected, mode=mode)
+
+    def test_one_empty_line_ff(self) -> None:
+        mode = pyink.Mode(preview=True)
+        for nl in ["\n", "\r\n"]:
+            expected = nl
+            tmp_file = Path(pyink.dump_to_file(nl))
+            if system() == "Windows":
+                # Writing files in text mode automatically uses the system newline,
+                # but in this case we don't want this for testing reasons. See:
+                # https://github.com/psf/black/pull/3348
+                with open(tmp_file, "wb") as f:
+                    f.write(nl.encode("utf-8"))
+            try:
+                self.assertFalse(
+                    ff(tmp_file, mode=mode, write_back=pyink.WriteBack.YES)
+                )
+                with open(tmp_file, "rb") as f:
+                    actual = f.read().decode("utf8")
+            finally:
+                os.unlink(tmp_file)
+            self.assertFormatEqual(expected, actual)
 
     def test_experimental_string_processing_warns(self) -> None:
         self.assertWarns(
@@ -490,8 +519,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e1: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "1 file reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "1 file reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f3"), pyink.Changed.YES)
@@ -500,8 +531,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(out_lines[-1], "reformatted f3")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.failed(Path("e2"), "boom")
@@ -510,8 +543,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e2: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.path_ignored(Path("wat"), "no match")
@@ -520,8 +555,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(out_lines[-1], "wat ignored: no match")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f4"), pyink.Changed.NO)
@@ -530,22 +567,28 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(out_lines[-1], "f4 already well formatted, good job.")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 3 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 3 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.check = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
             report.check = False
             report.diff = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
 
     def test_report_quiet(self) -> None:
@@ -587,8 +630,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e1: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "1 file reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "1 file reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f3"), pyink.Changed.YES)
@@ -596,8 +641,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(len(err_lines), 1)
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.failed(Path("e2"), "boom")
@@ -606,8 +653,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e2: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.path_ignored(Path("wat"), "no match")
@@ -615,8 +664,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(len(err_lines), 2)
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f4"), pyink.Changed.NO)
@@ -624,22 +675,28 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(len(err_lines), 2)
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 3 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 3 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.check = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
             report.check = False
             report.diff = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
 
     def test_report_normal(self) -> None:
@@ -683,8 +740,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e1: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "1 file reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "1 file reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f3"), pyink.Changed.YES)
@@ -693,8 +752,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(out_lines[-1], "reformatted f3")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 1 file failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 1 file failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.failed(Path("e2"), "boom")
@@ -703,8 +764,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(err_lines[-1], "error: cannot format e2: boom")
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.path_ignored(Path("wat"), "no match")
@@ -712,8 +775,10 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(len(err_lines), 2)
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 2 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 2 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.done(Path("f4"), pyink.Changed.NO)
@@ -721,22 +786,28 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(len(err_lines), 2)
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files reformatted, 3 files left unchanged, 2 files failed to"
-                " reformat.",
+                (
+                    "2 files reformatted, 3 files left unchanged, 2 files failed to"
+                    " reformat."
+                ),
             )
             self.assertEqual(report.return_code, 123)
             report.check = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
             report.check = False
             report.diff = True
             self.assertEqual(
                 unstyle(str(report)),
-                "2 files would be reformatted, 3 files would be left unchanged, 2"
-                " files would fail to reformat.",
+                (
+                    "2 files would be reformatted, 3 files would be left unchanged, 2"
+                    " files would fail to reformat."
+                ),
             )
 
     def test_lib2to3_parse(self) -> None:
@@ -929,8 +1000,8 @@ class BlackTestCase(BlackBaseTestCase):
         )
 
     def test_format_file_contents(self) -> None:
-        empty = ""
         mode = DEFAULT_MODE
+        empty = ""
         with self.assertRaises(pyink.NothingChanged):
             pyink.format_file_contents(empty, mode=mode, fast=False)
         just_nl = "\n"
@@ -947,6 +1018,17 @@ class BlackTestCase(BlackBaseTestCase):
         with self.assertRaises(pyink.InvalidInput) as e:
             pyink.format_file_contents(invalid, mode=mode, fast=False)
         self.assertEqual(str(e.exception), "Cannot parse: 1:7: return if you can")
+
+        mode = pyink.Mode(preview=True)
+        just_crlf = "\r\n"
+        with self.assertRaises(pyink.NothingChanged):
+            pyink.format_file_contents(just_crlf, mode=mode, fast=False)
+        just_whitespace_nl = "\n\t\n \n\t \n \t\n\n"
+        actual = pyink.format_file_contents(just_whitespace_nl, mode=mode, fast=False)
+        self.assertEqual("\n", actual)
+        just_whitespace_crlf = "\r\n\t\r\n \r\n\t \r\n \t\r\n\r\n"
+        actual = pyink.format_file_contents(just_whitespace_crlf, mode=mode, fast=False)
+        self.assertEqual("\r\n", actual)
 
     def test_endmarker(self) -> None:
         n = pyink.lib2to3_parse("\n")
@@ -1241,8 +1323,51 @@ class BlackTestCase(BlackBaseTestCase):
             report.done.assert_called_with(expected, pyink.Changed.YES)
 
     def test_reformat_one_with_stdin_empty(self) -> None:
+        cases = [
+            ("", ""),
+            ("\n", "\n"),
+            ("\r\n", "\r\n"),
+            (" \t", ""),
+            (" \t\n\t ", "\n"),
+            (" \t\r\n\t ", "\r\n"),
+        ]
+
+        def _new_wrapper(
+            output: io.StringIO, io_TextIOWrapper: Type[io.TextIOWrapper]
+        ) -> Callable[[Any, Any], io.TextIOWrapper]:
+            def get_output(*args: Any, **kwargs: Any) -> io.TextIOWrapper:
+                if args == (sys.stdout.buffer,):
+                    # It's `format_stdin_to_stdout()` calling `io.TextIOWrapper()`,
+                    # return our mock object.
+                    return output
+                # It's something else (i.e. `decode_bytes()`) calling
+                # `io.TextIOWrapper()`, pass through to the original implementation.
+                # See discussion in https://github.com/psf/black/pull/2489
+                return io_TextIOWrapper(*args, **kwargs)
+
+            return get_output
+
+        mode = pyink.Mode(preview=True)
+        for content, expected in cases:
+            output = io.StringIO()
+            io_TextIOWrapper = io.TextIOWrapper
+
+            with patch("io.TextIOWrapper", _new_wrapper(output, io_TextIOWrapper)):
+                try:
+                    pyink.format_stdin_to_stdout(
+                        fast=True,
+                        content=content,
+                        write_back=pyink.WriteBack.YES,
+                        mode=mode,
+                    )
+                except io.UnsupportedOperation:
+                    pass  # StringIO does not support detach
+                assert output.getvalue() == expected
+
+        # An empty string is the only test case for `preview=False`
         output = io.StringIO()
-        with patch("io.TextIOWrapper", lambda *args, **kwargs: output):
+        io_TextIOWrapper = io.TextIOWrapper
+        with patch("io.TextIOWrapper", _new_wrapper(output, io_TextIOWrapper)):
             try:
                 pyink.format_stdin_to_stdout(
                     fast=True,
@@ -1958,6 +2083,17 @@ class TestFileCollection:
         ctx.obj["root"] = base
         assert_collected_sources(src, expected, ctx=ctx, extend_exclude=r"/exclude/")
 
+    def test_gitignore_used_on_multiple_sources(self) -> None:
+        root = Path(DATA_DIR / "gitignore_used_on_multiple_sources")
+        expected = [
+            root / "dir1" / "b.py",
+            root / "dir2" / "b.py",
+        ]
+        ctx = FakeContext()
+        ctx.obj["root"] = root
+        src = [root / "dir1", root / "dir2"]
+        assert_collected_sources(src, expected, ctx=ctx)
+
     @patch("pyink.find_project_root", lambda *args: (THIS_DIR.resolve(), None))
     def test_exclude_for_issue_1572(self) -> None:
         # Exclude shouldn't touch files that were explicitly given to Black through the
@@ -1991,7 +2127,7 @@ class TestFileCollection:
                 None,
                 None,
                 report,
-                gitignore,
+                {path: gitignore},
                 verbose=False,
                 quiet=False,
             )
@@ -2020,7 +2156,7 @@ class TestFileCollection:
                 None,
                 None,
                 report,
-                root_gitignore,
+                {path: root_gitignore},
                 verbose=False,
                 quiet=False,
             )
@@ -2057,6 +2193,32 @@ class TestFileCollection:
 
         gitignore = path / "a" / ".gitignore"
         assert f"Could not parse {gitignore}" in result.stderr_bytes.decode()
+
+    def test_gitignore_that_ignores_subfolders(self) -> None:
+        # If gitignore with */* is in root
+        root = Path(DATA_DIR / "ignore_subfolders_gitignore_tests" / "subdir")
+        expected = [root / "b.py"]
+        ctx = FakeContext()
+        ctx.obj["root"] = root
+        assert_collected_sources([root], expected, ctx=ctx)
+
+        # If .gitignore with */* is nested
+        root = Path(DATA_DIR / "ignore_subfolders_gitignore_tests")
+        expected = [
+            root / "a.py",
+            root / "subdir" / "b.py",
+        ]
+        ctx = FakeContext()
+        ctx.obj["root"] = root
+        assert_collected_sources([root], expected, ctx=ctx)
+
+        # If command is executed from outer dir
+        root = Path(DATA_DIR / "ignore_subfolders_gitignore_tests")
+        target = root / "subdir"
+        expected = [target / "b.py"]
+        ctx = FakeContext()
+        ctx.obj["root"] = root
+        assert_collected_sources([target], expected, ctx=ctx)
 
     def test_empty_include(self) -> None:
         path = DATA_DIR / "include_exclude_tests"
@@ -2112,7 +2274,7 @@ class TestFileCollection:
                     None,
                     None,
                     report,
-                    gitignore,
+                    {path: gitignore},
                     verbose=False,
                     quiet=False,
                 )

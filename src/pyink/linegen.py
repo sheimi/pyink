@@ -3,10 +3,16 @@ Generating lines of code.
 """
 import sys
 from dataclasses import dataclass
+from enum import Enum, auto
 from functools import partial, wraps
 from typing import Collection, Iterator, List, Literal, Optional, Set, Union, cast
 
-from pyink.brackets import COMMA_PRIORITY, DOT_PRIORITY, max_delimiter_priority_in_atom
+from pyink.brackets import (
+    COMMA_PRIORITY,
+    DOT_PRIORITY,
+    get_leaves_inside_matching_brackets,
+    max_delimiter_priority_in_atom,
+)
 from pyink.comments import FMT_OFF, generate_comments, list_comments
 from pyink.lines import (
     Indentation,
@@ -584,6 +590,12 @@ def transform_line(
         yield line
 
 
+class _BracketSplitComponent(Enum):
+    head = auto()
+    body = auto()
+    tail = auto()
+
+
 def left_hand_split(line: Line, _features: Collection[Feature] = ()) -> Iterator[Line]:
     """Split line into many lines, starting with the first matching bracket pair.
 
@@ -614,9 +626,15 @@ def left_hand_split(line: Line, _features: Collection[Feature] = ()) -> Iterator
     if not matching_bracket:
         raise CannotSplit("No brackets found")
 
-    head = bracket_split_build_line(head_leaves, line, matching_bracket)
-    body = bracket_split_build_line(body_leaves, line, matching_bracket, is_body=True)
-    tail = bracket_split_build_line(tail_leaves, line, matching_bracket)
+    head = bracket_split_build_line(
+        head_leaves, line, matching_bracket, component=_BracketSplitComponent.head
+    )
+    body = bracket_split_build_line(
+        body_leaves, line, matching_bracket, component=_BracketSplitComponent.body
+    )
+    tail = bracket_split_build_line(
+        tail_leaves, line, matching_bracket, component=_BracketSplitComponent.tail
+    )
     bracket_split_succeeded_or_raise(head, body, tail)
     for result in (head, body, tail):
         if result:
@@ -713,7 +731,10 @@ def _first_right_hand_split(
             inner_closing_brackets.insert(0, inner_body_leaves.pop())
         if len(inner_body_leaves) < len(body_leaves):
             inner_body = bracket_split_build_line(
-                inner_body_leaves, line, opening_brackets[0], is_body=True
+                inner_body_leaves,
+                line,
+                opening_brackets[0],
+                component=_BracketSplitComponent.body,
             )
             if inner_body.should_split_rhs:
                 # Only when the inner body itself will be split, should we prefer
@@ -723,12 +744,16 @@ def _first_right_hand_split(
                 tail_leaves = inner_closing_brackets + tail_leaves
                 body = inner_body  # No need to re-calculate body.
 
-    head = bracket_split_build_line(head_leaves, line, opening_brackets[0])
+    head = bracket_split_build_line(
+        head_leaves, line, opening_bracket, component=_BracketSplitComponent.head
+    )
     if body is None:
         body = bracket_split_build_line(
-            body_leaves, line, opening_brackets[0], is_body=True
+            body_leaves, line, opening_bracket, component=_BracketSplitComponent.body
         )
-    tail = bracket_split_build_line(tail_leaves, line, opening_brackets[0])
+    tail = bracket_split_build_line(
+        tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
+    )
     bracket_split_succeeded_or_raise(head, body, tail)
     return _RHSResult(head, body, tail, opening_bracket, closing_bracket)
 
@@ -865,15 +890,23 @@ def bracket_split_succeeded_or_raise(head: Line, body: Line, tail: Line) -> None
 
 
 def bracket_split_build_line(
-    leaves: List[Leaf], original: Line, opening_bracket: Leaf, *, is_body: bool = False
+    leaves: List[Leaf],
+    original: Line,
+    opening_bracket: Leaf,
+    *,
+    component: _BracketSplitComponent,
 ) -> Line:
     """Return a new line with given `leaves` and respective comments from `original`.
 
-    If `is_body` is True, the result line is one-indented inside brackets and as such
-    has its first leaf's prefix normalized and a trailing comma added when expected.
+    If it's the head component, brackets will be tracked so trailing commas are
+    respected.
+
+    If it's the body component, the result line is one-indented inside brackets and as
+    such has its first leaf's prefix normalized and a trailing comma added when
+    expected.
     """
     result = Line(mode=original.mode, depth=original.depth)
-    if is_body:
+    if component is _BracketSplitComponent.body:
         result.inside_brackets = True
         result.depth = result.depth + (Indentation.CONTINUATION,)
         if leaves:
@@ -911,12 +944,24 @@ def bracket_split_build_line(
                         leaves.insert(i + 1, new_comma)
                     break
 
+    leaves_to_track: Set[LeafID] = set()
+    if (
+        Preview.handle_trailing_commas_in_head in original.mode
+        and component is _BracketSplitComponent.head
+    ):
+        leaves_to_track = get_leaves_inside_matching_brackets(leaves)
     # Populate the line
     for leaf in leaves:
-        result.append(leaf, preformatted=True)
+        result.append(
+            leaf,
+            preformatted=True,
+            track_bracket=id(leaf) in leaves_to_track,
+        )
         for comment_after in original.comments_after(leaf):
             result.append(comment_after, preformatted=True)
-    if is_body and should_split_line(result, opening_bracket):
+    if component is _BracketSplitComponent.body and should_split_line(
+        result, opening_bracket
+    ):
         result.should_split_rhs = True
     return result
 
