@@ -162,6 +162,24 @@ There are also a few *Pyink* only options:
                                   always use double quotes.
 ```
 
+## Is there a VS Code extension for *Pyink*?
+
+No, but with a bit workaround, you can use the
+[Black Formatter](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter)
+extension. After installing *Pyink* and the extension, you can set these in VS
+Code's `settings.json`:
+
+```json
+{
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "black-formatter.path": [
+        "path/to/pyink"
+    ]
+}
+```
+
 # Why the name?
 
 We want a name with the same number of characters as *Black*, to make patching
