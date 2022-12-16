@@ -121,18 +121,21 @@ patches as possible in the future.
             ...
     ```
 
-*   (Not yet released) Prefer splitting right hand side of assignment statements
-    (see [psf/black#1498](https://github.com/psf/black/issues/1498), this is
-    being upstreamed in
-    [psf/black/pull/3368](https://github.com/psf/black/pull/3368)). Example:
+## Historical differences
+
+These are differences that existed in the past. We have upstreamed them to
+*Black* so they are now identical.
+
+*   Prefer splitting right hand side of assignment statements
+    (see [psf/black#1498](https://github.com/psf/black/issues/1498). Example:
 
     ```python
-    # Pyink:
+    # New:
     some_dictionary["some_key"] = (
         some_long_expression_causing_long_line
     )
 
-    # Black:
+    # Old:
     some_dictionary[
         "some_key"
     ] = some_long_expression_causing_long_line

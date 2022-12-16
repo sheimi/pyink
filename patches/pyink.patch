@@ -332,11 +332,8 @@
              str(mode),
 --- a/linegen.py
 +++ b/linegen.py
-@@ -2,9 +2,10 @@
- Generating lines of code.
- """
- import sys
-+from dataclasses import dataclass
+@@ -5,7 +5,7 @@ import sys
+ from dataclasses import dataclass
  from enum import Enum, auto
  from functools import partial, wraps
 -from typing import Collection, Iterator, List, Optional, Set, Union, cast
@@ -344,7 +341,7 @@
  
  from pyink.brackets import (
      COMMA_PRIORITY,
-@@ -14,6 +15,7 @@ from pyink.brackets import (
+@@ -15,6 +15,7 @@ from pyink.brackets import (
  )
  from pyink.comments import FMT_OFF, generate_comments, list_comments
  from pyink.lines import (
@@ -352,15 +349,7 @@
      Line,
      append_leaves,
      can_be_split,
-@@ -24,6 +26,7 @@ from pyink.lines import (
- from pyink.mode import Feature, Mode, Preview
- from pyink.nodes import (
-     ASSIGNMENTS,
-+    BRACKETS,
-     CLOSING_BRACKETS,
-     OPENING_BRACKETS,
-     RARROW,
-@@ -76,6 +79,9 @@ LeafID = int
+@@ -78,6 +79,9 @@ LeafID = int
  LN = Union[Leaf, Node]
  
  
@@ -370,7 +359,7 @@
  class CannotSplit(CannotTransform):
      """A readable split that fits the allotted line length is impossible."""
  
-@@ -94,7 +100,9 @@ class LineGenerator(Visitor[Line]):
+@@ -96,7 +100,9 @@ class LineGenerator(Visitor[Line]):
          self.current_line: Line
          self.__post_init__()
  
@@ -381,7 +370,7 @@
          """Generate a line.
  
          If the line is empty, only emit if it makes sense.
-@@ -103,11 +111,20 @@ class LineGenerator(Visitor[Line]):
+@@ -105,11 +111,20 @@ class LineGenerator(Visitor[Line]):
          If any lines were generated, set up a new current_line.
          """
          if not self.current_line:
@@ -404,7 +393,7 @@
          yield complete_line
  
      def visit_default(self, node: LN) -> Iterator[Line]:
-@@ -133,7 +150,9 @@ class LineGenerator(Visitor[Line]):
+@@ -135,7 +150,9 @@ class LineGenerator(Visitor[Line]):
              normalize_prefix(node, inside_brackets=any_open_brackets)
              if self.mode.string_normalization and node.type == token.STRING:
                  node.value = normalize_string_prefix(node.value)
@@ -415,7 +404,7 @@
              if node.type == token.NUMBER:
                  normalize_numeric_literal(node)
              if node.type not in WHITESPACE:
-@@ -143,7 +162,7 @@ class LineGenerator(Visitor[Line]):
+@@ -145,7 +162,7 @@ class LineGenerator(Visitor[Line]):
      def visit_INDENT(self, node: Leaf) -> Iterator[Line]:
          """Increase indentation level, maybe yield a line."""
          # In blib2to3 INDENT never holds comments.
@@ -424,7 +413,7 @@
          yield from self.visit_default(node)
  
      def visit_DEDENT(self, node: Leaf) -> Iterator[Line]:
-@@ -158,7 +177,7 @@ class LineGenerator(Visitor[Line]):
+@@ -160,7 +177,7 @@ class LineGenerator(Visitor[Line]):
          yield from self.visit_default(node)
  
          # Finally, emit the dedent.
@@ -433,7 +422,7 @@
  
      def visit_stmt(
          self, node: Node, keywords: Set[str], parens: Set[str]
-@@ -236,9 +255,9 @@ class LineGenerator(Visitor[Line]):
+@@ -255,9 +272,9 @@ class LineGenerator(Visitor[Line]):
              if self.mode.is_pyi and is_stub_body(node):
                  yield from self.visit_default(node)
              else:
@@ -445,7 +434,7 @@
  
          else:
              if (
-@@ -344,7 +363,9 @@ class LineGenerator(Visitor[Line]):
+@@ -363,7 +380,9 @@ class LineGenerator(Visitor[Line]):
                      # formatting as visit_default() is called *after*. To avoid a
                      # situation where this function formats a docstring differently on
                      # the second pass, normalize it early.
@@ -456,7 +445,7 @@
                  else:
                      docstring = leaf.value
              else:
-@@ -361,7 +382,7 @@ class LineGenerator(Visitor[Line]):
+@@ -380,7 +399,7 @@ class LineGenerator(Visitor[Line]):
              quote_len = 1 if docstring[1] != quote_char else 3
              docstring = docstring[quote_len:-quote_len]
              docstring_started_empty = not docstring
@@ -465,7 +454,7 @@
  
              if is_multiline_string(leaf):
                  docstring = fix_docstring(docstring, indent)
-@@ -444,7 +465,8 @@ class LineGenerator(Visitor[Line]):
+@@ -463,7 +482,8 @@ class LineGenerator(Visitor[Line]):
          self.visit_classdef = partial(v, keywords={"class"}, parens=Ø)
          self.visit_expr_stmt = partial(v, keywords=Ø, parens=ASSIGNMENTS)
          self.visit_return_stmt = partial(v, keywords={"return"}, parens={"return"})
@@ -475,7 +464,7 @@
          self.visit_del_stmt = partial(v, keywords=Ø, parens={"del"})
          self.visit_async_funcdef = self.visit_async_stmt
          self.visit_decorated = self.visit_decorators
-@@ -471,10 +493,11 @@ def transform_line(
+@@ -490,10 +510,11 @@ def transform_line(
  
      ll = mode.line_length
      sn = mode.string_normalization
@@ -491,47 +480,17 @@
  
      transformers: List[Transformer]
      if (
-@@ -626,6 +649,17 @@ def left_hand_split(line: Line, _feature
-             yield result
- 
- 
-+@dataclass
-+class _RHSResult:
-+    """Intermediate split result from a right hand split."""
-+
-+    head: Line
-+    body: Line
-+    tail: Line
-+    opening_bracket: Leaf
-+    closing_bracket: Leaf
-+
-+
- def right_hand_split(
-     line: Line,
-     line_length: int,
-@@ -640,6 +674,21 @@ def right_hand_split(
- 
-     Note: running this function modifies `bracket_depth` on the leaves of `line`.
-     """
-+    rhs_result = _first_right_hand_split(line, omit=omit)
-+    yield from _maybe_split_omitting_optional_parens(
-+        rhs_result, line, line_length, features=features, omit=omit
-+    )
-+
-+
-+def _first_right_hand_split(
-+    line: Line,
-+    omit: Collection[LeafID] = (),
-+) -> _RHSResult:
-+    """Split the line into head, body, tail starting with the last bracket pair.
+@@ -681,8 +702,7 @@ def _first_right_hand_split(
+     omit: Collection[LeafID] = (),
+ ) -> _RHSResult:
+     """Split the line into head, body, tail starting with the last bracket pair.
+-
+-    Note: this function should not have side effects. It's relied upon by
 +    Note: this function should not have side effects. It's replied upon by
-+    _maybe_split_omitting_optional_parens to get an opinion whether to prefer
-+    splitting on the right side of an assignment statement.
-+    """
-     tail_leaves: List[Leaf] = []
-     body_leaves: List[Leaf] = []
-     head_leaves: List[Leaf] = []
-@@ -665,47 +714,120 @@ def right_hand_split(
+     _maybe_split_omitting_optional_parens to get an opinion whether to prefer
+     splitting on the right side of an assignment statement.
+     """
+@@ -711,12 +731,51 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -586,134 +545,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-     bracket_split_succeeded_or_raise(head, body, tail)
-+    return _RHSResult(head, body, tail, opening_bracket, closing_bracket)
-+
-+
-+def _maybe_split_omitting_optional_parens(
-+    rhs: _RHSResult,
-+    line: Line,
-+    line_length: int,
-+    features: Collection[Feature] = (),
-+    omit: Collection[LeafID] = (),
-+) -> Iterator[Line]:
-     if (
-         Feature.FORCE_OPTIONAL_PARENTHESES not in features
-         # the opening bracket is an optional paren
--        and opening_bracket.type == token.LPAR
--        and not opening_bracket.value
-+        and rhs.opening_bracket.type == token.LPAR
-+        and not rhs.opening_bracket.value
-         # the closing bracket is an optional paren
--        and closing_bracket.type == token.RPAR
--        and not closing_bracket.value
-+        and rhs.closing_bracket.type == token.RPAR
-+        and not rhs.closing_bracket.value
-         # it's not an import (optional parens are the only thing we can split on
-         # in this case; attempting a split without them is a waste of time)
-         and not line.is_import
-         # there are no standalone comments in the body
--        and not body.contains_standalone_comments(0)
-+        and not rhs.body.contains_standalone_comments(0)
-         # and we can actually remove the parens
--        and can_omit_invisible_parens(body, line_length)
-+        and can_omit_invisible_parens(rhs.body, line_length)
-     ):
--        omit = {id(closing_bracket), *omit}
-+        omit = {id(rhs.closing_bracket), *omit}
-         try:
--            yield from right_hand_split(line, line_length, features=features, omit=omit)
--            return
-+            # The _RHSResult Omitting Optional Parens.
-+            rhs_oop = _first_right_hand_split(line, omit=omit)
-+            if not (
-+                line.mode.is_pyink
-+                # the split is right after `=`
-+                and len(rhs.head.leaves) >= 2
-+                and rhs.head.leaves[-2].type == token.EQUAL
-+                # the left side of assignement contains brackets
-+                and any(leaf.type in BRACKETS for leaf in rhs.head.leaves[:-1])
-+                # the left side of assignment is short enough (the -1 is for the ending
-+                # optional paren)
-+                and is_line_short_enough(rhs.head, line_length=line_length - 1)
-+                # the left side of assignment won't explode further because of magic
-+                # trailing comma
-+                and rhs.head.magic_trailing_comma is None
-+                # the split by omitting optional parens isn't preferred by some other
-+                # reason
-+                and not _prefer_split_rhs_oop(rhs_oop, line_length=line_length)
-+            ):
-+                yield from _maybe_split_omitting_optional_parens(
-+                    rhs_oop, line, line_length, features=features, omit=omit
-+                )
-+                return
- 
-         except CannotSplit as e:
-             if not (
--                can_be_split(body)
--                or is_line_short_enough(body, line_length=line_length)
-+                can_be_split(rhs.body)
-+                or is_line_short_enough(rhs.body, line_length=line_length)
-             ):
-                 raise CannotSplit(
-                     "Splitting failed, body is still too long and can't be split."
-                 ) from e
- 
--            elif head.contains_multiline_strings() or tail.contains_multiline_strings():
-+            elif (
-+                rhs.head.contains_multiline_strings()
-+                or rhs.tail.contains_multiline_strings()
-+            ):
-                 raise CannotSplit(
-                     "The current optional pair of parentheses is bound to fail to"
-                     " satisfy the splitting algorithm because the head or the tail"
-@@ -713,13 +835,42 @@ def right_hand_split(
-                     " line."
-                 ) from e
- 
--    ensure_visible(opening_bracket)
--    ensure_visible(closing_bracket)
--    for result in (head, body, tail):
-+    ensure_visible(rhs.opening_bracket)
-+    ensure_visible(rhs.closing_bracket)
-+    for result in (rhs.head, rhs.body, rhs.tail):
-         if result:
-             yield result
- 
- 
-+def _prefer_split_rhs_oop(rhs_oop: _RHSResult, line_length: int) -> bool:
-+    """
-+    Returns whether we should prefer the result from a split omitting optional parens.
-+    """
-+    has_closing_bracket_after_assign = False
-+    for leaf in reversed(rhs_oop.head.leaves):
-+        if leaf.type == token.EQUAL:
-+            break
-+        if leaf.type in CLOSING_BRACKETS:
-+            has_closing_bracket_after_assign = True
-+            break
-+    return (
-+        # contains matching brackets after the `=` (done by checking there is a
-+        # closing bracket)
-+        has_closing_bracket_after_assign
-+        or (
-+            # the split is actually from inside the optional parens (done by checking
-+            # the first line still contains the `=`)
-+            any(leaf.type == token.EQUAL for leaf in rhs_oop.head.leaves)
-+            # the first line is short enough
-+            and is_line_short_enough(rhs_oop.head, line_length=line_length)
-+        )
-+        # contains unsplittable type ignore
-+        or rhs_oop.head.contains_unsplittable_type_ignore()
-+        or rhs_oop.body.contains_unsplittable_type_ignore()
-+        or rhs_oop.tail.contains_unsplittable_type_ignore()
-+    )
-+
-+
- def bracket_split_succeeded_or_raise(head: Line, body: Line, tail: Line) -> None:
-     """Raise :exc:`CannotSplit` if the last left- or right-hand split failed.
- 
-@@ -765,7 +916,7 @@ def bracket_split_build_line(
+@@ -874,7 +933,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -722,7 +554,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1239,7 +1390,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1348,7 +1407,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -957,7 +789,7 @@
  from warnings import warn
  
  if sys.version_info < (3, 8):
-@@ -165,11 +165,26 @@ class Deprecated(UserWarning):
+@@ -169,11 +169,26 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
  
@@ -984,7 +816,7 @@
      is_pyi: bool = False
      is_ipynb: bool = False
      skip_source_first_line: bool = False
-@@ -177,6 +192,8 @@ class Mode:
+@@ -181,6 +196,8 @@ class Mode:
      experimental_string_processing: bool = False
      python_cell_magics: Set[str] = field(default_factory=set)
      preview: bool = False
@@ -993,7 +825,7 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -211,12 +228,25 @@ class Mode:
+@@ -215,12 +232,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
@@ -1484,24 +1316,6 @@
  
          if is_valid_index(string_idx - 1):
              p_idx = string_idx - 1
-@@ -1044,7 +1049,7 @@ class BaseStringSplitter(StringTransform
-         return max_string_length
- 
-     @staticmethod
--    def _prefer_paren_wrap_match(LL: List[Leaf]) -> Optional[int]:
-+    def _prefer_paren_wrap_match(LL: List[Leaf], is_pyink: bool) -> Optional[int]:
-         """
-         Returns:
-             string_idx such that @LL[string_idx] is equal to our target (i.e.
-@@ -1169,7 +1174,7 @@ class StringSplitter(BaseStringSplitter,
-     def do_splitter_match(self, line: Line) -> TMatchResult:
-         LL = line.leaves
- 
--        if self._prefer_paren_wrap_match(LL) is not None:
-+        if self._prefer_paren_wrap_match(LL, line.mode.is_pyink) is not None:
-             return TErr("Line needs to be wrapped in parens first.")
- 
-         is_valid_index = is_valid_index_factory(LL)
 @@ -1271,7 +1276,7 @@ class StringSplitter(BaseStringSplitter,
                  line we will construct.
              """
@@ -1536,16 +1350,7 @@
  
      def _normalize_f_string(self, string: str, prefix: str) -> str:
          """
-@@ -1684,7 +1691,7 @@ class StringParenWrapper(BaseStringSplit
-             or self._assert_match(LL)
-             or self._assign_match(LL)
-             or self._dict_match(LL)
--            or self._prefer_paren_wrap_match(LL)
-+            or self._prefer_paren_wrap_match(LL, line.mode.is_pyink)
-         )
- 
-         if string_idx is not None:
-@@ -1692,7 +1699,8 @@ class StringParenWrapper(BaseStringSplit
+@@ -1694,7 +1701,8 @@ class StringParenWrapper(BaseStringSplit
              # If the string has no spaces...
              if " " not in string_value:
                  # And will still violate the line length limit when split...
@@ -1555,7 +1360,7 @@
                  if len(string_value) > max_string_length:
                      # And has no associated custom splits...
                      if not self.has_custom_splits(string_value):
-@@ -1930,7 +1938,7 @@ class StringParenWrapper(BaseStringSplit
+@@ -1933,7 +1941,7 @@ class StringParenWrapper(BaseStringSplit
          string_value = LL[string_idx].value
          string_line = Line(
              mode=line.mode,

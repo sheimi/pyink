@@ -198,6 +198,23 @@ class LineGenerator(Visitor[Line]):
 
             yield from self.visit(child)
 
+    def visit_dictsetmaker(self, node: Node) -> Iterator[Line]:
+        if Preview.wrap_long_dict_values_in_parens in self.mode:
+            for i, child in enumerate(node.children):
+                if i == 0:
+                    continue
+                if node.children[i - 1].type == token.COLON:
+                    if child.type == syms.atom and child.children[0].type == token.LPAR:
+                        if maybe_make_parens_invisible_in_atom(
+                            child,
+                            parent=node,
+                            remove_brackets_around_comma=False,
+                        ):
+                            wrap_in_parentheses(node, child, visible=False)
+                    else:
+                        wrap_in_parentheses(node, child, visible=False)
+        yield from self.visit_default(node)
+
     def visit_funcdef(self, node: Node) -> Iterator[Line]:
         """Visit function definition."""
         if Preview.annotation_parens not in self.mode:
@@ -785,7 +802,7 @@ def _maybe_split_omitting_optional_parens(
             # The _RHSResult Omitting Optional Parens.
             rhs_oop = _first_right_hand_split(line, omit=omit)
             if not (
-                line.mode.is_pyink
+                Preview.prefer_splitting_right_hand_side_of_assignments in line.mode
                 # the split is right after `=`
                 and len(rhs.head.leaves) >= 2
                 and rhs.head.leaves[-2].type == token.EQUAL
@@ -1459,8 +1476,10 @@ def run_transformer(
 
         result.extend(transform_line(transformed_line, mode=mode, features=features))
 
+    features_set = set(features)
     if (
-        transform.__class__.__name__ != "rhs"
+        Feature.FORCE_OPTIONAL_PARENTHESES in features_set
+        or transform.__class__.__name__ != "rhs"
         or not line.bracket_tracker.invisible
         or any(bracket.value for bracket in line.bracket_tracker.invisible)
         or line.contains_multiline_strings()
@@ -1477,7 +1496,7 @@ def run_transformer(
 
     line_copy = line.clone()
     append_leaves(line_copy, line, line.leaves)
-    features_fop = set(features) | {Feature.FORCE_OPTIONAL_PARENTHESES}
+    features_fop = features_set | {Feature.FORCE_OPTIONAL_PARENTHESES}
     second_opinion = run_transformer(
         line_copy, transform, mode, features_fop, line_str=line_str
     )
