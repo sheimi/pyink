@@ -83,27 +83,6 @@ patches as possible in the future.
     )
     ```
 
-*   Wrap concatenated strings in parens for function arguments (see
-    [psf/black#3292](https://github.com/psf/black/issues/3292)). Example:
-
-    ```python
-    # Pyink:
-    function_call(
-        (
-            " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
-            " incididunt ut labore et dolore magna aliqua Ut enim ad minim"
-        ),
-        " veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo",
-    )
-
-    # Black:
-    function_call(
-        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
-        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
-        " veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo",
-    )
-    ```
-
 *   Add an empty line between class statements without docstrings, and the first
     method. We expect we will simply remove this difference from *Pyink* at some
     point. Example:
@@ -125,6 +104,27 @@ patches as possible in the future.
 
 These are differences that existed in the past. We have upstreamed them to
 *Black* so they are now identical.
+
+*   Wrap concatenated strings in parens for function arguments (see
+    [psf/black#3292](https://github.com/psf/black/issues/3292)). Example:
+
+    ```python
+    # New:
+    function_call(
+        (
+            " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+            " incididunt ut labore et dolore magna aliqua Ut enim ad minim"
+        ),
+        " veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo",
+    )
+
+    # Old:
+    function_call(
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+        " veniam quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo",
+    )
+    ```
 
 *   Prefer splitting right hand side of assignment statements
     (see [psf/black#1498](https://github.com/psf/black/issues/1498). Example:
