@@ -554,7 +554,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1348,7 +1407,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1350,7 +1409,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -660,7 +660,7 @@
      semantic_leading_comment: Optional[LinesBlock] = None
  
      def maybe_empty_lines(self, current_line: Line) -> LinesBlock:
-@@ -529,7 +563,7 @@ class EmptyLineTracker:
+@@ -530,7 +564,7 @@ class EmptyLineTracker:
  
      def _maybe_empty_lines(self, current_line: Line) -> Tuple[int, int]:
          max_allowed = 1
@@ -669,7 +669,7 @@
              max_allowed = 1 if self.mode.is_pyi else 2
          if current_line.leaves:
              # Consume the first leaf's extra newlines.
-@@ -540,7 +574,7 @@ class EmptyLineTracker:
+@@ -541,7 +575,7 @@ class EmptyLineTracker:
          else:
              before = 0
          depth = current_line.depth
@@ -678,7 +678,7 @@
              if self.mode.is_pyi:
                  assert self.previous_line is not None
                  if depth and not current_line.is_def and self.previous_line.is_def:
-@@ -579,8 +613,9 @@ class EmptyLineTracker:
+@@ -580,8 +614,9 @@ class EmptyLineTracker:
          if (
              self.previous_line
              and self.previous_line.is_import
@@ -690,7 +690,7 @@
          ):
              return (before or 1), 0
  
-@@ -592,6 +627,14 @@ class EmptyLineTracker:
+@@ -593,6 +628,14 @@ class EmptyLineTracker:
              return before, 1
  
          if (
@@ -705,7 +705,7 @@
              Preview.remove_block_trailing_newline in current_line.mode
              and self.previous_line
              and self.previous_line.opens_block
-@@ -615,15 +658,16 @@ class EmptyLineTracker:
+@@ -616,15 +659,16 @@ class EmptyLineTracker:
  
              return 0, 0
  
@@ -725,7 +725,7 @@
              and before == 0
          ):
              slc = self.semantic_leading_comment
-@@ -642,9 +686,9 @@ class EmptyLineTracker:
+@@ -643,9 +687,9 @@ class EmptyLineTracker:
  
          if self.mode.is_pyi:
              if current_line.is_class or self.previous_line.is_class:
@@ -737,7 +737,7 @@
                      newlines = 1
                  elif current_line.is_stub_class and self.previous_line.is_stub_class:
                      # No blank line between classes with an empty body
-@@ -662,7 +706,7 @@ class EmptyLineTracker:
+@@ -663,7 +707,7 @@ class EmptyLineTracker:
                      # Blank line between a block of functions (maybe with preceding
                      # decorators) and a block of non-functions
                      newlines = 1
@@ -746,7 +746,7 @@
                  newlines = 1
              else:
                  newlines = 0
-@@ -717,8 +761,12 @@ def is_line_short_enough(line: Line, *,
+@@ -718,8 +762,12 @@ def is_line_short_enough(line: Line, *,
      """
      if not line_str:
          line_str = line_to_string(line)
@@ -760,7 +760,7 @@
          and "\n" not in line_str  # multiline strings
          and not line.contains_standalone_comments()
      )
-@@ -830,7 +878,7 @@ def can_omit_invisible_parens(
+@@ -831,7 +879,7 @@ def can_omit_invisible_parens(
  def _can_omit_opening_paren(line: Line, *, first: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
      remainder = False
@@ -769,7 +769,7 @@
      _index = -1
      for _index, leaf, leaf_length in line.enumerate_with_length():
          if leaf.type in CLOSING_BRACKETS and leaf.opening_bracket is first:
-@@ -854,7 +902,7 @@ def _can_omit_opening_paren(line: Line,
+@@ -855,7 +903,7 @@ def _can_omit_opening_paren(line: Line,
  
  def _can_omit_closing_paren(line: Line, *, last: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
@@ -914,8 +914,8 @@
  classifiers = [
    "Development Status :: 5 - Production/Stable",
    "Environment :: Console",
-@@ -70,129 +42,42 @@ dependencies = [
-   "tomli>=1.1.0; python_full_version < '3.11.0a7'",
+@@ -70,47 +42,34 @@ dependencies = [
+   "tomli>=1.1.0; python_version < '3.11'",
    "typed-ast>=1.4.2; python_version < '3.8' and implementation_name == 'cpython'",
    "typing_extensions>=3.10.0.0; python_version < '3.10'",
 +  "black>=22.10.0",
@@ -968,81 +968,7 @@
  [tool.hatch.build.targets.wheel]
  only-include = ["src"]
  sources = ["src"]
- 
--[tool.hatch.build.targets.wheel.hooks.mypyc]
--enable-by-default = false
--dependencies = [
--  "hatch-mypyc>=0.13.0",
--  "mypy==0.991",
--  # Required stubs to be removed when the packages support PEP 561 themselves
--  "types-typed-ast>=1.4.2",
--]
--require-runtime-dependencies = true
--exclude = [
--  # There's no good reason for blackd to be compiled.
--  "/src/blackd",
--  # Not performance sensitive, so save bytes + compilation time:
--  "/src/blib2to3/__init__.py",
--  "/src/blib2to3/pgen2/__init__.py",
--  "/src/black/output.py",
--  "/src/black/concurrency.py",
--  "/src/black/files.py",
--  "/src/black/report.py",
--  # Breaks the test suite when compiled (and is also useless):
--  "/src/black/debug.py",
--  # Compiled modules can't be run directly and that's a problem here:
--  "/src/black/__main__.py",
--]
--options = { debug_level = "0" }
--
--[tool.cibuildwheel]
--build-verbosity = 1
--# So these are the environments we target:
--# - Python: CPython 3.7+ only
--# - Architecture (64-bit only): amd64 / x86_64, universal2, and arm64
--# - OS: Linux (no musl), Windows, and macOS
--build = "cp3*-*"
--skip = ["*-manylinux_i686", "*-musllinux_*", "*-win32", "pp-*"]
--# This is the bare minimum needed to run the test suite. Pulling in the full
--# test_requirements.txt would download a bunch of other packages not necessary
--# here and would slow down the testing step a fair bit.
--test-requires = ["pytest>=6.1.1"]
--test-command = 'pytest {project} -k "not incompatible_with_mypyc"'
--test-extras = ["d"," jupyter"]
--# Skip trying to test arm64 builds on Intel Macs. (so cross-compilation doesn't
--# straight up crash)
--test-skip = ["*-macosx_arm64", "*-macosx_universal2:arm64"]
--
--[tool.cibuildwheel.environment]
--HATCH_BUILD_HOOKS_ENABLE = "1"
--MYPYC_OPT_LEVEL = "3"
--MYPYC_DEBUG_LEVEL = "0"
--# CPython 3.11 wheels aren't available for aiohttp and building a Cython extension
--# from source also doesn't work.
--AIOHTTP_NO_EXTENSIONS = "1"
--
--[tool.cibuildwheel.linux]
--before-build = [
--    "yum install -y clang gcc",
--]
--
--[tool.cibuildwheel.linux.environment]
--HATCH_BUILD_HOOKS_ENABLE = "1"
--MYPYC_OPT_LEVEL = "3"
--MYPYC_DEBUG_LEVEL = "0"
--# Black needs Clang to compile successfully on Linux.
--CC = "clang"
--AIOHTTP_NO_EXTENSIONS = "1"
--
--[tool.isort]
--atomic = true
--profile = "black"
--line_length = 88
--skip_gitignore = true
--skip_glob = ["src/blib2to3", "tests/data", "profiling"]
--known_first_party = ["black", "blib2to3", "blackd", "_black_version"]
--
- [tool.pytest.ini_options]
+@@ -119,7 +78,6 @@ sources = ["src"]
  # Option below requires `tests/optional.py`
  addopts = "--strict-config --strict-markers"
  optional-tests = [
@@ -1271,9 +1197,9 @@
 +    pyink --check {toxinidir}/src {toxinidir}/tests
 --- a/trans.py
 +++ b/trans.py
-@@ -32,8 +32,8 @@ from mypy_extensions import trait
+@@ -31,8 +31,8 @@ else:
+ from mypy_extensions import trait
  
- from pyink.brackets import BracketMatchError
  from pyink.comments import contains_pragma_comment
 -from pyink.lines import Line, append_leaves
 -from pyink.mode import Feature
@@ -1296,7 +1222,7 @@
  
      @abstractmethod
      def do_match(self, line: Line) -> TMatchResult:
-@@ -558,7 +561,9 @@ class StringMerger(StringTransformer, Cu
+@@ -560,7 +563,9 @@ class StringMerger(StringTransformer, Cu
  
          S_leaf = Leaf(token.STRING, S)
          if self.normalize_strings:
@@ -1307,7 +1233,7 @@
  
          # Fill the 'custom_splits' list with the appropriate CustomSplit objects.
          temp_string = S_leaf.value[len(prefix) + 1 : -1]
-@@ -964,7 +969,7 @@ class BaseStringSplitter(StringTransform
+@@ -965,7 +970,7 @@ class BaseStringSplitter(StringTransform
          #   NN: The leaf that is after N.
  
          # WMA4 the whitespace at the beginning of the line.
@@ -1316,7 +1242,7 @@
  
          if is_valid_index(string_idx - 1):
              p_idx = string_idx - 1
-@@ -1271,7 +1276,7 @@ class StringSplitter(BaseStringSplitter,
+@@ -1272,7 +1277,7 @@ class StringSplitter(BaseStringSplitter,
                  line we will construct.
              """
              result = self.line_length
@@ -1325,7 +1251,7 @@
              result -= 1 if ends_with_comma else 0
              result -= string_op_leaves_length
              return result
-@@ -1282,11 +1287,11 @@ class StringSplitter(BaseStringSplitter,
+@@ -1283,11 +1288,11 @@ class StringSplitter(BaseStringSplitter,
          # The last index of a string of length N is N-1.
          max_break_idx -= 1
          # Leading whitespace is not present in the string value (e.g. Leaf.value).
@@ -1339,7 +1265,7 @@
              )
              return
  
-@@ -1574,7 +1579,9 @@ class StringSplitter(BaseStringSplitter,
+@@ -1580,7 +1585,9 @@ class StringSplitter(BaseStringSplitter,
  
      def _maybe_normalize_string_quotes(self, leaf: Leaf) -> None:
          if self.normalize_strings:
@@ -1350,7 +1276,7 @@
  
      def _normalize_f_string(self, string: str, prefix: str) -> str:
          """
-@@ -1694,7 +1701,8 @@ class StringParenWrapper(BaseStringSplit
+@@ -1700,7 +1707,8 @@ class StringParenWrapper(BaseStringSplit
              # If the string has no spaces...
              if " " not in string_value:
                  # And will still violate the line length limit when split...
@@ -1360,7 +1286,7 @@
                  if len(string_value) > max_string_length:
                      # And has no associated custom splits...
                      if not self.has_custom_splits(string_value):
-@@ -1933,7 +1941,7 @@ class StringParenWrapper(BaseStringSplit
+@@ -1939,7 +1947,7 @@ class StringParenWrapper(BaseStringSplit
          string_value = LL[string_idx].value
          string_line = Line(
              mode=line.mode,
