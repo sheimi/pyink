@@ -918,7 +918,7 @@
    "tomli>=1.1.0; python_version < '3.11'",
    "typed-ast>=1.4.2; python_version < '3.8' and implementation_name == 'cpython'",
    "typing_extensions>=3.10.0.0; python_version < '3.10'",
-+  "black>=22.10.0",
++  "black>=22.12.0",
  ]
 -dynamic = ["readme", "version"]
 +dynamic = ["version"]
@@ -1222,7 +1222,7 @@
  
      @abstractmethod
      def do_match(self, line: Line) -> TMatchResult:
-@@ -560,7 +563,9 @@ class StringMerger(StringTransformer, Cu
+@@ -639,7 +642,9 @@ class StringMerger(StringTransformer, Cu
  
          S_leaf = Leaf(token.STRING, S)
          if self.normalize_strings:
@@ -1233,7 +1233,7 @@
  
          # Fill the 'custom_splits' list with the appropriate CustomSplit objects.
          temp_string = S_leaf.value[len(prefix) + 1 : -1]
-@@ -965,7 +970,7 @@ class BaseStringSplitter(StringTransform
+@@ -1078,7 +1083,7 @@ class BaseStringSplitter(StringTransform
          #   NN: The leaf that is after N.
  
          # WMA4 the whitespace at the beginning of the line.
@@ -1242,7 +1242,7 @@
  
          if is_valid_index(string_idx - 1):
              p_idx = string_idx - 1
-@@ -1272,7 +1277,7 @@ class StringSplitter(BaseStringSplitter,
+@@ -1392,7 +1397,7 @@ class StringSplitter(BaseStringSplitter,
                  line we will construct.
              """
              result = self.line_length
@@ -1251,7 +1251,7 @@
              result -= 1 if ends_with_comma else 0
              result -= string_op_leaves_length
              return result
-@@ -1283,11 +1288,11 @@ class StringSplitter(BaseStringSplitter,
+@@ -1403,11 +1408,11 @@ class StringSplitter(BaseStringSplitter,
          # The last index of a string of length N is N-1.
          max_break_idx -= 1
          # Leading whitespace is not present in the string value (e.g. Leaf.value).
@@ -1265,7 +1265,7 @@
              )
              return
  
-@@ -1580,7 +1585,9 @@ class StringSplitter(BaseStringSplitter,
+@@ -1700,7 +1705,9 @@ class StringSplitter(BaseStringSplitter,
  
      def _maybe_normalize_string_quotes(self, leaf: Leaf) -> None:
          if self.normalize_strings:
@@ -1276,7 +1276,7 @@
  
      def _normalize_f_string(self, string: str, prefix: str) -> str:
          """
-@@ -1700,7 +1707,8 @@ class StringParenWrapper(BaseStringSplit
+@@ -1820,7 +1827,8 @@ class StringParenWrapper(BaseStringSplit
              # If the string has no spaces...
              if " " not in string_value:
                  # And will still violate the line length limit when split...
@@ -1286,7 +1286,7 @@
                  if len(string_value) > max_string_length:
                      # And has no associated custom splits...
                      if not self.has_custom_splits(string_value):
-@@ -1939,7 +1947,7 @@ class StringParenWrapper(BaseStringSplit
+@@ -2066,7 +2074,7 @@ class StringParenWrapper(BaseStringSplit
          string_value = LL[string_idx].value
          string_line = Line(
              mode=line.mode,
