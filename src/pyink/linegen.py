@@ -363,7 +363,7 @@ class LineGenerator(Visitor[Line]):
         yield from self.visit_default(node)
 
     def visit_STRING(self, leaf: Leaf) -> Iterator[Line]:
-        if is_docstring(leaf) and "\\\n" not in leaf.value:
+        if is_docstring(leaf, self.mode.is_pyink) and "\\\n" not in leaf.value:
             # We're ignoring docstrings with backslash newline escapes because changing
             # indentation of those changes the AST representation of the code.
             if Preview.normalize_docstring_quotes_and_prefixes_properly in self.mode:

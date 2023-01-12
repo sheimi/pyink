@@ -100,6 +100,9 @@ patches as possible in the future.
             ...
     ```
 
+*   Module docstrings are formatted same as other docstrings (see
+    [psf/black#3493](https://github.com/psf/black/issues/3493)).
+
 ## Historical differences
 
 These are differences that existed in the past. We have upstreamed them to
@@ -127,7 +130,7 @@ These are differences that existed in the past. We have upstreamed them to
     ```
 
 *   Prefer splitting right hand side of assignment statements
-    (see [psf/black#1498](https://github.com/psf/black/issues/1498). Example:
+    (see [psf/black#1498](https://github.com/psf/black/issues/1498)). Example:
 
     ```python
     # New:

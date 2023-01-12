@@ -434,6 +434,15 @@
  
          else:
              if (
+@@ -348,7 +365,7 @@ class LineGenerator(Visitor[Line]):
+         yield from self.visit_default(node)
+ 
+     def visit_STRING(self, leaf: Leaf) -> Iterator[Line]:
+-        if is_docstring(leaf) and "\\\n" not in leaf.value:
++        if is_docstring(leaf, self.mode.is_pyink) and "\\\n" not in leaf.value:
+             # We're ignoring docstrings with backslash newline escapes because changing
+             # indentation of those changes the AST representation of the code.
+             if Preview.normalize_docstring_quotes_and_prefixes_properly in self.mode:
 @@ -363,7 +380,9 @@ class LineGenerator(Visitor[Line]):
                      # formatting as visit_default() is called *after*. To avoid a
                      # situation where this function formats a docstring differently on
@@ -851,6 +860,32 @@
 +            return Quote.SINGLE
 +        else:
 +            return Quote.DOUBLE
+--- a/nodes.py
++++ b/nodes.py
+@@ -521,7 +521,7 @@ def is_arith_like(node: LN) -> bool:
+     }
+ 
+ 
+-def is_docstring(leaf: Leaf) -> bool:
++def is_docstring(leaf: Leaf, is_pyink: bool) -> bool:
+     if prev_siblings_are(
+         leaf.parent, [None, token.NEWLINE, token.INDENT, syms.simple_stmt]
+     ):
+@@ -533,6 +533,14 @@ def is_docstring(leaf: Leaf) -> bool:
+         # grammar. We're safe to return True without further checks.
+         return True
+ 
++    # Module docstring.
++    if (
++        is_pyink
++        and prev_siblings_are(leaf.parent, [None, syms.simple_stmt])
++        and leaf.parent.parent.type == syms.file_input
++    ):
++        return True
++
+     return False
+ 
+ 
 --- a/pyproject.toml
 +++ b/pyproject.toml
 @@ -1,51 +1,23 @@

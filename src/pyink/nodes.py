@@ -522,7 +522,7 @@ def is_arith_like(node: LN) -> bool:
     }
 
 
-def is_docstring(leaf: Leaf) -> bool:
+def is_docstring(leaf: Leaf, is_pyink: bool) -> bool:
     if prev_siblings_are(
         leaf.parent, [None, token.NEWLINE, token.INDENT, syms.simple_stmt]
     ):
@@ -532,6 +532,14 @@ def is_docstring(leaf: Leaf) -> bool:
     if prev_siblings_are(leaf.parent, [syms.parameters, token.COLON, syms.simple_stmt]):
         # `syms.parameters` is only used in funcdefs and async_funcdefs in the Python
         # grammar. We're safe to return True without further checks.
+        return True
+
+    # Module docstring.
+    if (
+        is_pyink
+        and prev_siblings_are(leaf.parent, [None, syms.simple_stmt])
+        and leaf.parent.parent.type == syms.file_input
+    ):
         return True
 
     return False
