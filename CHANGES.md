@@ -4,7 +4,8 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-* Nothing notable unreleased.
+* Fixed a bug in incremental formatting (`--pyink_lines=`) where pairs of
+  `# fmt: off/on` are used outside of the line ranges.
 
 ## 22.12.0
 

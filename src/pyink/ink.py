@@ -76,6 +76,16 @@ def convert_unchanged_lines(src_node: Node, lines: Collection[Tuple[int, int]]):
     _convert_unchanged_line_by_line(src_node, lines_set)
 
 
+def _contains_standalone_comment(node: LN) -> bool:
+    if isinstance(node, Leaf):
+        return node.type == STANDALONE_COMMENT
+    else:
+        for child in node.children:
+            if _contains_standalone_comment(child):
+                return True
+        return False
+
+
 class _TopLevelStatementsVisitor(Visitor[None]):
     """A node visitor that converts unchanged top-level statements to STANDALONE_COMMENT.
 
@@ -102,6 +112,12 @@ class _TopLevelStatementsVisitor(Visitor[None]):
 
     def visit_suite(self, node: Node) -> Iterator[None]:
         yield from []
+        # If there is a STANDALONE_COMMENT node, it means parts of the node tree
+        # have fmt on/off/skip markers. Those STANDALONE_COMMENT nodes can't
+        # be simply converted by calling str(node). So we just don't convert
+        # here.
+        if _contains_standalone_comment(node):
+            return
         # Find the semantic parent of this suite. For `async_stmt` and
         # `async_funcdef`, the ASYNC token is defined on a separate level by the
         # grammar.
