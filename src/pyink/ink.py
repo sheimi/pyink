@@ -141,13 +141,28 @@ def _convert_unchanged_line_by_line(node: Node, lines_set: Set[int]):
             # We only consider "unwrapped lines", which are divided by the NEWLINE
             # token.
             continue
-        if _is_suite(leaf.parent):
+        if leaf.parent.type == syms.match_stmt:
+            # The `suite` node is defined as:
+            #   match_stmt: "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
+            # Here we need to check `subject_expr`. The `case_block+` will be
+            # checked by their own NEWLINEs.
+            nodes_to_ignore = []
+            prev_sibling = leaf.prev_sibling
+            while prev_sibling:
+                nodes_to_ignore.insert(0, prev_sibling)
+                prev_sibling = prev_sibling.prev_sibling
+            if not nodes_to_ignore:
+                assert False, "Unexpected empty nodes in the match_stmt"
+                continue
+            if not _get_line_range(nodes_to_ignore).intersection(lines_set):
+                _convert_nodes_to_standardalone_comment(nodes_to_ignore)
+        elif leaf.parent.type == syms.suite:
             # The `suite` node is defined as:
             #   suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT
             # We will check `simple_stmt` and `stmt+` separately against the lines set
             parent_sibling = leaf.parent.prev_sibling
             nodes_to_ignore = []
-            while parent_sibling and not _is_suite(parent_sibling):
+            while parent_sibling and not parent_sibling.type == syms.suite:
                 # NOTE: Multiple suite nodes can exist as siblings in e.g. `if_stmt`.
                 nodes_to_ignore.insert(0, parent_sibling)
                 parent_sibling = parent_sibling.prev_sibling
@@ -277,7 +292,3 @@ def _furthest_ancestor_with_last_leaf(leaf: Leaf) -> Node:
     while node.parent and node.parent.children and node is node.parent.children[-1]:
         node = node.parent
     return node
-
-
-def _is_suite(node: LN) -> bool:
-    return type_repr(node.type) == "suite"

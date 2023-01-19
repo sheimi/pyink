@@ -6,6 +6,8 @@ All notable changes to Pyink are recorded here.
 
 * Fixed a bug in incremental formatting (`--pyink_lines=`) where pairs of
   `# fmt: off/on` are used outside of the line ranges.
+* Fixed a bug in incremental formatting (`--pyink_lines=`) when part of the
+  match statement is changed.
 
 ## 22.12.0
 
