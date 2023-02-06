@@ -47,6 +47,7 @@ from pyink.nodes import (
     is_rpar_token,
     is_stub_body,
     is_stub_suite,
+    is_tuple_containing_walrus,
     is_vararg,
     is_walrus_assignment,
     is_yield,
@@ -59,6 +60,7 @@ from pyink.strings import (
     get_string_prefix,
     normalize_string_prefix,
     normalize_string_quotes,
+    normalize_unicode_escape_sequences,
 )
 from pyink.trans import (
     CannotTransform,
@@ -93,8 +95,9 @@ class LineGenerator(Visitor[Line]):
     in ways that will no longer stringify to valid Python code on the tree.
     """
 
-    def __init__(self, mode: Mode) -> None:
+    def __init__(self, mode: Mode, features: Collection[Feature]) -> None:
         self.mode = mode
+        self.features = features
         self.current_line: Line
         self.__post_init__()
 
@@ -157,6 +160,25 @@ class LineGenerator(Visitor[Line]):
                 self.current_line.append(node)
         yield from super().visit_default(node)
 
+    def visit_test(self, node: Node) -> Iterator[Line]:
+        """Visit an `x if y else z` test"""
+
+        if (
+            Preview.parenthesize_conditional_expressions in self.mode
+            and not self.mode.is_pyink
+        ):
+            already_parenthesized = (
+                node.prev_sibling and node.prev_sibling.type == token.LPAR
+            )
+
+            if not already_parenthesized:
+                lpar = Leaf(token.LPAR, "")
+                rpar = Leaf(token.RPAR, "")
+                node.insert_child(0, lpar)
+                node.append_child(rpar)
+
+        yield from self.visit_default(node)
+
     def visit_INDENT(self, node: Leaf) -> Iterator[Line]:
         """Increase indentation level, maybe yield a line."""
         # In blib2to3 INDENT never holds comments.
@@ -191,7 +213,9 @@ class LineGenerator(Visitor[Line]):
         `parens` holds a set of string leaf values immediately after which
         invisible parens should be put.
         """
-        normalize_invisible_parens(node, parens_after=parens, preview=self.mode.preview)
+        normalize_invisible_parens(
+            node, parens_after=parens, mode=self.mode, features=self.features
+        )
         for child in node.children:
             if is_name_token(child) and child.value in keywords:
                 yield from self.line()
@@ -244,7 +268,9 @@ class LineGenerator(Visitor[Line]):
 
     def visit_match_case(self, node: Node) -> Iterator[Line]:
         """Visit either a match or case statement."""
-        normalize_invisible_parens(node, parens_after=set(), preview=self.mode.preview)
+        normalize_invisible_parens(
+            node, parens_after=set(), mode=self.mode, features=self.features
+        )
 
         yield from self.line()
         for child in node.children:
@@ -363,6 +389,12 @@ class LineGenerator(Visitor[Line]):
         yield from self.visit_default(node)
 
     def visit_STRING(self, leaf: Leaf) -> Iterator[Line]:
+        if (
+            Preview.hex_codes_in_unicode_sequences in self.mode
+            and not self.mode.is_pyink
+        ):
+            normalize_unicode_escape_sequences(leaf)
+
         if is_docstring(leaf, self.mode.is_pyink) and "\\\n" not in leaf.value:
             # We're ignoring docstrings with backslash newline escapes because changing
             # indentation of those changes the AST representation of the code.
@@ -404,6 +436,7 @@ class LineGenerator(Visitor[Line]):
             else:
                 docstring = docstring.strip()
 
+            has_trailing_backslash = False
             if docstring:
                 # Add some padding if the docstring starts / ends with a quote mark.
                 if docstring[0] == quote_char:
@@ -416,6 +449,7 @@ class LineGenerator(Visitor[Line]):
                         # Odd number of tailing backslashes, add some padding to
                         # avoid escaping the closing string quote.
                         docstring += " "
+                        has_trailing_backslash = True
             elif not docstring_started_empty:
                 docstring = " "
 
@@ -438,6 +472,8 @@ class LineGenerator(Visitor[Line]):
                 if (
                     len(lines) > 1
                     and last_line_length + quote_len > self.mode.line_length
+                    and len(indent) + quote_len <= self.mode.line_length
+                    and not has_trailing_backslash
                 ):
                     leaf.value = prefix + quote + docstring + "\n" + indent + quote
                 else:
@@ -1128,7 +1164,7 @@ def normalize_prefix(leaf: Leaf, *, inside_brackets: bool) -> None:
 
 
 def normalize_invisible_parens(
-    node: Node, parens_after: Set[str], *, preview: bool
+    node: Node, parens_after: Set[str], *, mode: Mode, features: Collection[Feature]
 ) -> None:
     """Make existing optional parentheses invisible or create new ones.
 
@@ -1138,17 +1174,24 @@ def normalize_invisible_parens(
     Standardizes on visible parentheses for single-element tuples, and keeps
     existing visible parentheses for other tuples and generator expressions.
     """
-    for pc in list_comments(node.prefix, is_endmarker=False, preview=preview):
+    for pc in list_comments(node.prefix, is_endmarker=False, preview=mode.preview):
         if pc.value in FMT_OFF:
             # This `node` has a prefix with `# fmt: off`, don't mess with parens.
             return
+
+    # The multiple context managers grammar has a different pattern, thus this is
+    # separate from the for-loop below. This possibly wraps them in invisible parens,
+    # and later will be removed in remove_with_parens when needed.
+    if node.type == syms.with_stmt:
+        _maybe_wrap_cms_in_parens(node, mode, features)
+
     check_lpar = False
     for index, child in enumerate(list(node.children)):
         # Fixes a bug where invisible parens are not properly stripped from
         # assignment statements that contain type annotations.
         if isinstance(child, Node) and child.type == syms.annassign:
             normalize_invisible_parens(
-                child, parens_after=parens_after, preview=preview
+                child, parens_after=parens_after, mode=mode, features=features
             )
 
         # Add parentheses around long tuple unpacking in assignments.
@@ -1161,7 +1204,7 @@ def normalize_invisible_parens(
 
         if check_lpar:
             if (
-                preview
+                mode.preview
                 and child.type == syms.atom
                 and node.type == syms.for_stmt
                 and isinstance(child.prev_sibling, Leaf)
@@ -1174,7 +1217,9 @@ def normalize_invisible_parens(
                     remove_brackets_around_comma=True,
                 ):
                     wrap_in_parentheses(node, child, visible=False)
-            elif preview and isinstance(child, Node) and node.type == syms.with_stmt:
+            elif (
+                mode.preview and isinstance(child, Node) and node.type == syms.with_stmt
+            ):
                 remove_with_parens(child, node)
             elif child.type == syms.atom:
                 if maybe_make_parens_invisible_in_atom(
@@ -1185,17 +1230,7 @@ def normalize_invisible_parens(
             elif is_one_tuple(child):
                 wrap_in_parentheses(node, child, visible=True)
             elif node.type == syms.import_from:
-                # "import from" nodes store parentheses directly as part of
-                # the statement
-                if is_lpar_token(child):
-                    assert is_rpar_token(node.children[-1])
-                    # make parentheses invisible
-                    child.value = ""
-                    node.children[-1].value = ""
-                elif child.type != token.STAR:
-                    # insert invisible parentheses
-                    node.insert_child(index, Leaf(token.LPAR, ""))
-                    node.append_child(Leaf(token.RPAR, ""))
+                _normalize_import_from(node, child, index)
                 break
             elif (
                 index == 1
@@ -1210,11 +1245,25 @@ def normalize_invisible_parens(
             elif not (isinstance(child, Leaf) and is_multiline_string(child)):
                 wrap_in_parentheses(node, child, visible=False)
 
-        comma_check = child.type == token.COMMA if preview else False
+        comma_check = child.type == token.COMMA if mode.preview else False
 
         check_lpar = isinstance(child, Leaf) and (
             child.value in parens_after or comma_check
         )
+
+
+def _normalize_import_from(parent: Node, child: LN, index: int) -> None:
+    # "import from" nodes store parentheses directly as part of
+    # the statement
+    if is_lpar_token(child):
+        assert is_rpar_token(parent.children[-1])
+        # make parentheses invisible
+        child.value = ""
+        parent.children[-1].value = ""
+    elif child.type != token.STAR:
+        # insert invisible parentheses
+        parent.insert_child(index, Leaf(token.LPAR, ""))
+        parent.append_child(Leaf(token.RPAR, ""))
 
 
 def remove_await_parens(node: Node) -> None:
@@ -1239,18 +1288,62 @@ def remove_await_parens(node: Node) -> None:
             # N.B. We've still removed any redundant nested brackets though :)
             opening_bracket = cast(Leaf, node.children[1].children[0])
             closing_bracket = cast(Leaf, node.children[1].children[-1])
-            bracket_contents = cast(Node, node.children[1].children[1])
-            if bracket_contents.type != syms.power:
-                ensure_visible(opening_bracket)
-                ensure_visible(closing_bracket)
-            elif (
-                bracket_contents.type == syms.power
-                and bracket_contents.children[0].type == token.AWAIT
-            ):
-                ensure_visible(opening_bracket)
-                ensure_visible(closing_bracket)
-                # If we are in a nested await then recurse down.
-                remove_await_parens(bracket_contents)
+            bracket_contents = node.children[1].children[1]
+            if isinstance(bracket_contents, Node):
+                if bracket_contents.type != syms.power:
+                    ensure_visible(opening_bracket)
+                    ensure_visible(closing_bracket)
+                elif (
+                    bracket_contents.type == syms.power
+                    and bracket_contents.children[0].type == token.AWAIT
+                ):
+                    ensure_visible(opening_bracket)
+                    ensure_visible(closing_bracket)
+                    # If we are in a nested await then recurse down.
+                    remove_await_parens(bracket_contents)
+
+
+def _maybe_wrap_cms_in_parens(
+    node: Node, mode: Mode, features: Collection[Feature]
+) -> None:
+    """When enabled and safe, wrap the multiple context managers in invisible parens.
+
+    It is only safe when `features` contain Feature.PARENTHESIZED_CONTEXT_MANAGERS.
+    """
+    if (
+        Feature.PARENTHESIZED_CONTEXT_MANAGERS not in features
+        or Preview.wrap_multiple_context_managers_in_parens not in mode
+        or len(node.children) <= 2
+        # If it's an atom, it's already wrapped in parens.
+        or node.children[1].type == syms.atom
+    ):
+        return
+    colon_index: Optional[int] = None
+    for i in range(2, len(node.children)):
+        if node.children[i].type == token.COLON:
+            colon_index = i
+            break
+    if colon_index is not None:
+        lpar = Leaf(token.LPAR, "")
+        rpar = Leaf(token.RPAR, "")
+        context_managers = node.children[1:colon_index]
+        for child in context_managers:
+            child.remove()
+        # After wrapping, the with_stmt will look like this:
+        #   with_stmt
+        #     NAME 'with'
+        #     atom
+        #       LPAR ''
+        #       testlist_gexp
+        #         ... <-- context_managers
+        #       /testlist_gexp
+        #       RPAR ''
+        #     /atom
+        #     COLON ':'
+        new_child = Node(
+            syms.atom, [lpar, Node(syms.testlist_gexp, context_managers), rpar]
+        )
+        node.insert_child(1, new_child)
 
 
 def remove_with_parens(node: Node, parent: Node) -> None:
@@ -1318,6 +1411,7 @@ def maybe_make_parens_invisible_in_atom(
             not remove_brackets_around_comma
             and max_delimiter_priority_in_atom(node) >= COMMA_PRIORITY
         )
+        or is_tuple_containing_walrus(node)
     ):
         return False
 
@@ -1329,9 +1423,11 @@ def maybe_make_parens_invisible_in_atom(
             syms.return_stmt,
             syms.except_clause,
             syms.funcdef,
+            syms.with_stmt,
             # these ones aren't useful to end users, but they do please fuzzers
             syms.for_stmt,
             syms.del_stmt,
+            syms.for_stmt,
         ]:
             return False
 

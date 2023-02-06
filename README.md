@@ -103,6 +103,11 @@ patches as possible in the future.
 *   Module docstrings are formatted same as other docstrings (see
     [psf/black#3493](https://github.com/psf/black/issues/3493)).
 
+*   Temporarily disabled the following _Black_ future style changes:
+
+    *   https://github.com/psf/black/pull/2916
+    *   https://github.com/psf/black/pull/2278
+
 ## Historical differences
 
 These are differences that existed in the past. We have upstreamed them to

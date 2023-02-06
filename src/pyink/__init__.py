@@ -248,7 +248,7 @@ def validate_regex(
     multiple=True,
     help=(
         "When processing Jupyter Notebooks, add the given magic to the list"
-        f" of known python-magics ({', '.join(PYTHON_CELL_MAGICS)})."
+        f" of known python-magics ({', '.join(sorted(PYTHON_CELL_MAGICS))})."
         " Useful for formatting cells with custom python magics."
     ),
     default=[],
@@ -521,16 +521,20 @@ def main(  # noqa: C901
             )
 
             normalized = [
-                (source, source)
-                if source == "-"
-                else (normalize_path_maybe_ignore(Path(source), root), source)
+                (
+                    (source, source)
+                    if source == "-"
+                    else (normalize_path_maybe_ignore(Path(source), root), source)
+                )
                 for source in src
             ]
             srcs_string = ", ".join(
                 [
-                    f'"{_norm}"'
-                    if _norm
-                    else f'\033[31m"{source} (skipping - invalid)"\033[34m'
+                    (
+                        f'"{_norm}"'
+                        if _norm
+                        else f'\033[31m"{source} (skipping - invalid)"\033[34m'
+                    )
                     for _norm, source in normalized
                 ]
             )
@@ -742,10 +746,11 @@ def get_sources(
 
             sources.add(p)
         elif p.is_dir():
+            p = root / normalize_path_maybe_ignore(p, ctx.obj["root"], report)
             if using_default_exclude:
                 gitignore = {
                     root: root_gitignore,
-                    root / p: get_gitignore(p),
+                    p: get_gitignore(p),
                 }
             sources.update(
                 gen_python_files(
@@ -1207,13 +1212,18 @@ def _format_str_once(
 
     if mode.string_normalization and mode.quote_style == QuoteStyle.MAJORITY:
         mode = replace(mode, majority_quote=ink.majority_quote(src_node))
+    context_manager_features = {
+        feature
+        for feature in {Feature.PARENTHESIZED_CONTEXT_MANAGERS}
+        if supports_feature(versions, feature)
+    }
     normalize_fmt_off(src_node, preview=mode.preview)
 
     if lines:
         # This should be called after normalize_fmt_off.
         ink.convert_unchanged_lines(src_node, lines)
 
-    lines = LineGenerator(mode=mode)
+    lines = LineGenerator(mode=mode, features=context_manager_features)
     elt = EmptyLineTracker(mode=mode)
     split_line_features = {
         feature
@@ -1275,6 +1285,10 @@ def get_features_used(  # noqa: C901
     - relaxed decorator syntax;
     - usage of __future__ flags (annotations);
     - print / exec statements;
+    - parenthesized context managers;
+    - match statements;
+    - except* clause;
+    - variadic generics;
     """
     features: Set[Feature] = set()
     if future_imports:
@@ -1349,6 +1363,23 @@ def get_features_used(  # noqa: C901
             and n.children[3].type == syms.testlist_star_expr
         ):
             features.add(Feature.ANN_ASSIGN_EXTENDED_RHS)
+
+        elif (
+            n.type == syms.with_stmt
+            and len(n.children) > 2
+            and n.children[1].type == syms.atom
+        ):
+            atom_children = n.children[1].children
+            if (
+                len(atom_children) == 3
+                and atom_children[0].type == token.LPAR
+                and atom_children[1].type == syms.testlist_gexp
+                and atom_children[2].type == token.RPAR
+            ):
+                features.add(Feature.PARENTHESIZED_CONTEXT_MANAGERS)
+
+        elif n.type == syms.match_stmt:
+            features.add(Feature.PATTERN_MATCHING)
 
         elif (
             n.type == syms.except_clause
