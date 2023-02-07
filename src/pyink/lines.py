@@ -1,4 +1,4 @@
-import enum
+from enum import Enum, auto
 import itertools
 import re
 import sys
@@ -44,9 +44,9 @@ LeafID = int
 _PRAGMA_REGEX = re.compile("( *# (?:pylint|pytype):)")
 
 
-class Indentation(enum.Enum):
-    SCOPE = enum.auto()  # Scope indentation.
-    CONTINUATION = enum.auto()  # Continuation/hanging indentation.
+class Indentation(Enum):
+    SCOPE = auto()  # Scope indentation.
+    CONTINUATION = auto()  # Continuation/hanging indentation.
 
     def num_spaces(self, mode: Mode) -> int:
         if mode.is_pyink and self == Indentation.SCOPE:

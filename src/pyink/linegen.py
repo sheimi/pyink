@@ -79,7 +79,13 @@ LeafID = int
 LN = Union[Leaf, Node]
 
 
-_DEDENT = object()
+# Use a single-value enum as a sentinel object so that we could use it
+# inside a `Literal[]`.
+class _Dedent(Enum):
+    _DEDENT = auto()
+
+
+_DEDENT = _Dedent._DEDENT
 
 
 class CannotSplit(CannotTransform):
@@ -102,7 +108,7 @@ class LineGenerator(Visitor[Line]):
         self.__post_init__()
 
     def line(
-        self, indent: Union[Indentation, Literal[_DEDENT], None] = None
+        self, indent: Union[Indentation, Literal[_Dedent._DEDENT], None] = None
     ) -> Iterator[Line]:
         """Generate a line.
 
@@ -771,8 +777,8 @@ def _first_right_hand_split(
     ):
         # Find an inner body...
         inner_body_leaves = list(body_leaves)
-        inner_opening_brackets = []
-        inner_closing_brackets = []
+        inner_opening_brackets: List[Leaf] = []
+        inner_closing_brackets: List[Leaf] = []
         while (
             len(inner_body_leaves) >= 2
             and inner_body_leaves[0].type in OPENING_BRACKETS

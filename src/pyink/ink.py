@@ -68,7 +68,7 @@ def convert_unchanged_lines(src_node: Node, lines: Collection[Tuple[int, int]]):
     more formatting to pass (1). However, it's hard to get it correct when
     incorrect indentations are used. So we defer this to future optimizations.
     """
-    lines_set = set()
+    lines_set: Set[int] = set()
     for start, end in lines:
         lines_set.update(range(start, end + 1))
     visitor = _TopLevelStatementsVisitor(lines_set)
@@ -102,7 +102,11 @@ class _TopLevelStatementsVisitor(Visitor[None]):
         # won't visit its children nodes.
         yield from []
         newline_leaf = _last_leaf(node)
-        assert newline_leaf.type == NEWLINE
+        if not newline_leaf:
+            return
+        assert (
+            newline_leaf.type == NEWLINE
+        ), f"Unexpectedly found leaf.type={newline_leaf.type}"
         # We need to find the furthest ancestor with the NEWLINE as the last
         # leaf, since a `suite` can simply be a `simple_stmt` when it puts
         # its body on the same line. Example: `if cond: pass`.
@@ -130,7 +134,9 @@ class _TopLevelStatementsVisitor(Visitor[None]):
             ):
                 async_token = semantic_parent.prev_sibling
                 semantic_parent = semantic_parent.parent
-        if not _get_line_range(semantic_parent).intersection(self._lines_set):
+        if semantic_parent is not None and not _get_line_range(
+            semantic_parent
+        ).intersection(self._lines_set):
             _convert_node_to_standalone_comment(semantic_parent)
 
 
@@ -141,12 +147,12 @@ def _convert_unchanged_line_by_line(node: Node, lines_set: Set[int]):
             # We only consider "unwrapped lines", which are divided by the NEWLINE
             # token.
             continue
-        if leaf.parent.type == syms.match_stmt:
+        if leaf.parent and leaf.parent.type == syms.match_stmt:
             # The `suite` node is defined as:
             #   match_stmt: "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
             # Here we need to check `subject_expr`. The `case_block+` will be
             # checked by their own NEWLINEs.
-            nodes_to_ignore = []
+            nodes_to_ignore: List[LN] = []
             prev_sibling = leaf.prev_sibling
             while prev_sibling:
                 nodes_to_ignore.insert(0, prev_sibling)
@@ -156,7 +162,7 @@ def _convert_unchanged_line_by_line(node: Node, lines_set: Set[int]):
                 continue
             if not _get_line_range(nodes_to_ignore).intersection(lines_set):
                 _convert_nodes_to_standardalone_comment(nodes_to_ignore)
-        elif leaf.parent.type == syms.suite:
+        elif leaf.parent and leaf.parent.type == syms.suite:
             # The `suite` node is defined as:
             #   suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT
             # We will check `simple_stmt` and `stmt+` separately against the lines set
@@ -214,28 +220,32 @@ def _convert_node_to_standalone_comment(node: LN):
     prefix = first_leaf.prefix
     first_leaf.prefix = ""
     index = node.remove()
-    # Remove the '\n', as STANDALONE_COMMENT will have '\n' appended when
-    # genearting the formatted code.
-    value = str(node)[:-1]
-    parent.insert_child(
-        index,
-        Leaf(STANDALONE_COMMENT, value, prefix=prefix),
-    )
+    if index is not None:
+        # Remove the '\n', as STANDALONE_COMMENT will have '\n' appended when
+        # genearting the formatted code.
+        value = str(node)[:-1]
+        parent.insert_child(
+            index,
+            Leaf(STANDALONE_COMMENT, value, prefix=prefix),
+        )
 
 
 def _convert_nodes_to_standardalone_comment(nodes: Sequence[LN]):
     """Convert nodes to STANDALONE_COMMENT by modifying the tree inline."""
-    assert nodes, "Unexpected empty nodes"
+    if not nodes:
+        return
     parent = nodes[0].parent
-    assert parent, "Unexpected None parent"
     first_leaf = _first_leaf(nodes[0])
+    if not parent or not first_leaf:
+        return
     prefix = first_leaf.prefix
     first_leaf.prefix = ""
     value = "".join(str(node) for node in nodes)
     index = nodes[0].remove()
     for node in nodes[1:]:
         node.remove()
-    parent.insert_child(index, Leaf(STANDALONE_COMMENT, value, prefix=prefix))
+    if index is not None:
+        parent.insert_child(index, Leaf(STANDALONE_COMMENT, value, prefix=prefix))
 
 
 def _first_leaf(node: LN) -> Optional[Leaf]:
@@ -273,22 +283,30 @@ def _get_line_range(node_or_nodes: Union[LN, List[LN]]) -> Set[int]:
         nodes = node_or_nodes
         if not nodes:
             return set()
-        line_start = _first_leaf(nodes[0]).lineno
-        line_end = _leaf_line_end(_last_leaf(nodes[-1]))
-        return set(range(line_start, line_end + 1))
+        first_leaf = _first_leaf(nodes[0])
+        last_leaf = _last_leaf(nodes[-1])
+        if first_leaf and last_leaf:
+            line_start = first_leaf.lineno
+            line_end = _leaf_line_end(last_leaf)
+            return set(range(line_start, line_end + 1))
+        else:
+            return set()
     else:
         node = node_or_nodes
         if isinstance(node, Leaf):
             return set(range(node.lineno, _leaf_line_end(node) + 1))
         else:
-            return set(
-                range(_first_leaf(node).lineno, _leaf_line_end(_last_leaf(node)) + 1)
-            )
+            first_leaf = _first_leaf(node)
+            last_leaf = _last_leaf(node)
+            if first_leaf and last_leaf:
+                return set(range(first_leaf.lineno, _leaf_line_end(last_leaf) + 1))
+            else:
+                return set()
 
 
-def _furthest_ancestor_with_last_leaf(leaf: Leaf) -> Node:
+def _furthest_ancestor_with_last_leaf(leaf: Leaf) -> LN:
     """Returns the furthest ancestor that has this leaf node as the last leaf."""
-    node = leaf
+    node: LN = leaf
     while node.parent and node.parent.children and node is node.parent.children[-1]:
         node = node.parent
     return node

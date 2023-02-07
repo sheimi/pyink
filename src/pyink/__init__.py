@@ -1223,7 +1223,7 @@ def _format_str_once(
         # This should be called after normalize_fmt_off.
         ink.convert_unchanged_lines(src_node, lines)
 
-    lines = LineGenerator(mode=mode, features=context_manager_features)
+    line_generator = LineGenerator(mode=mode, features=context_manager_features)
     elt = EmptyLineTracker(mode=mode)
     split_line_features = {
         feature
@@ -1231,7 +1231,7 @@ def _format_str_once(
         if supports_feature(versions, feature)
     }
     block: Optional[LinesBlock] = None
-    for current_line in lines.visit(src_node):
+    for current_line in line_generator.visit(src_node):
         block = elt.maybe_empty_lines(current_line)
         dst_blocks.append(block)
         for line in transform_line(

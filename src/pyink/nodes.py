@@ -538,6 +538,8 @@ def is_docstring(leaf: Leaf, is_pyink: bool) -> bool:
     if (
         is_pyink
         and prev_siblings_are(leaf.parent, [None, syms.simple_stmt])
+        and leaf.parent
+        and leaf.parent.parent
         and leaf.parent.parent.type == syms.file_input
     ):
         return True
