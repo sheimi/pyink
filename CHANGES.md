@@ -4,6 +4,15 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
+* Nothing notable unreleased.
+
+## 23.1.0
+
+This release is based on Black v23.1.0.
+
+* Temporarily disabled the following _Black_ future style changes:
+    * https://github.com/psf/black/pull/2916
+    * https://github.com/psf/black/pull/2278
 * Fixed a bug in incremental formatting (`--pyink_lines=`) where pairs of
   `# fmt: off/on` are used outside of the line ranges.
 * Fixed a bug in incremental formatting (`--pyink_lines=`) when part of the
