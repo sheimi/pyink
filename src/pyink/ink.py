@@ -211,7 +211,13 @@ def _convert_node_to_standalone_comment(node: LN):
         assert False, "Unexpected empty first_leaf or last_leaf"
         return
     if first_leaf is last_leaf:
-        assert False, "Unexpected single leaf"
+        # This can happen on the following edge cases:
+        # 1. A block of `# fmt: off/on` code except the `# fmt: on` is placed
+        #    on the end of the last line instead of on a new line.
+        # 2. A single backslash on its own line followed by a comment line.
+        # Ideally we don't want to format them when not requested, but fixing
+        # isn't easy. These cases are also badly formatted code, so it isn't
+        # too bad we reformat them.
         return
     # The prefix contains comments and indentation whitespaces. They are
     # reformatted accordingly to the correct indentation level.
