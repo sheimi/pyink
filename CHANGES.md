@@ -4,7 +4,8 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-* Nothing notable unreleased.
+* Fixed a bug where a module docstring ends with a line that's `LineLength-3`
+  to `LineLength` long, an extra empty line was added.
 
 ## 23.1.0
 

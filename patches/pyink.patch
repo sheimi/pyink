@@ -504,7 +504,20 @@
  
              if is_multiline_string(leaf):
                  docstring = fix_docstring(docstring, indent)
-@@ -476,7 +507,8 @@ class LineGenerator(Visitor[Line]):
+@@ -437,7 +468,11 @@ class LineGenerator(Visitor[Line]):
+                 # If docstring is one line, we don't put the closing quotes on a
+                 # separate line because it looks ugly (#3320).
+                 lines = docstring.splitlines()
+-                last_line_length = len(lines[-1]) if docstring else 0
++                last_line_length = (
++                    # When docstring ends with '\n' the last line is empty,
++                    # not the last item from splitlines().
++                    len(lines[-1]) if docstring and not docstring.endswith("\n") else 0
++                )
+ 
+                 # If adding closing quotes would cause the last line to exceed
+                 # the maximum line length then put a line break before the
+@@ -476,7 +511,8 @@ class LineGenerator(Visitor[Line]):
          self.visit_classdef = partial(v, keywords={"class"}, parens=Ø)
          self.visit_expr_stmt = partial(v, keywords=Ø, parens=ASSIGNMENTS)
          self.visit_return_stmt = partial(v, keywords={"return"}, parens={"return"})
@@ -514,7 +527,7 @@
          self.visit_del_stmt = partial(v, keywords=Ø, parens={"del"})
          self.visit_async_funcdef = self.visit_async_stmt
          self.visit_decorated = self.visit_decorators
-@@ -503,10 +535,11 @@ def transform_line(
+@@ -503,10 +539,11 @@ def transform_line(
  
      ll = mode.line_length
      sn = mode.string_normalization
@@ -530,7 +543,7 @@
  
      transformers: List[Transformer]
      if (
-@@ -694,8 +727,7 @@ def _first_right_hand_split(
+@@ -694,8 +731,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> _RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -540,7 +553,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -724,12 +756,51 @@ def _first_right_hand_split(
+@@ -724,12 +760,51 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -595,7 +608,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -887,7 +958,7 @@ def bracket_split_build_line(
+@@ -887,7 +962,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -604,7 +617,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1417,7 +1488,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1417,7 +1492,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
