@@ -27,7 +27,7 @@
  from pyink.report import Changed, NothingChanged, Report
  from pyink.trans import iter_fexpr_spans
  from blib2to3.pgen2 import token
-@@ -282,6 +286,41 @@ def validate_regex(
+@@ -283,6 +287,41 @@ def validate_regex(
      ),
  )
  @click.option(
@@ -69,7 +69,7 @@
      "--check",
      is_flag=True,
      help=(
-@@ -440,6 +479,10 @@ def main(  # noqa: C901
+@@ -441,6 +480,10 @@ def main(  # noqa: C901
      skip_magic_trailing_comma: bool,
      experimental_string_processing: bool,
      preview: bool,
@@ -80,7 +80,7 @@
      quiet: bool,
      verbose: bool,
      required_version: Optional[str],
-@@ -540,6 +583,7 @@ def main(  # noqa: C901
+@@ -541,6 +584,7 @@ def main(  # noqa: C901
      else:
          # We'll autodetect later.
          versions = set()
@@ -88,7 +88,7 @@
      mode = Mode(
          target_versions=versions,
          line_length=line_length,
-@@ -551,8 +595,36 @@ def main(  # noqa: C901
+@@ -552,8 +596,36 @@ def main(  # noqa: C901
          experimental_string_processing=experimental_string_processing,
          preview=preview,
          python_cell_magics=set(python_cell_magics),
@@ -125,7 +125,7 @@
      if code is not None:
          # Run in quiet mode by default with -c; the extra output isn't useful.
          # You can still pass -v to get verbose output.
-@@ -596,6 +668,7 @@ def main(  # noqa: C901
+@@ -597,6 +669,7 @@ def main(  # noqa: C901
                  write_back=write_back,
                  mode=mode,
                  report=report,
@@ -133,7 +133,7 @@
              )
          else:
              from pyink.concurrency import reformat_many
-@@ -740,7 +813,13 @@ def reformat_code(
+@@ -741,7 +814,13 @@ def reformat_code(
  # not ideal, but this shouldn't cause any issues ... hopefully. ~ichard26
  @mypyc_attr(patchable=True)
  def reformat_one(
@@ -148,7 +148,7 @@
  ) -> None:
      """Reformat a single file under `src` without spawning child processes.
  
-@@ -765,7 +844,9 @@ def reformat_one(
+@@ -766,7 +845,9 @@ def reformat_one(
                  mode = replace(mode, is_pyi=True)
              elif src.suffix == ".ipynb":
                  mode = replace(mode, is_ipynb=True)
@@ -159,7 +159,7 @@
                  changed = Changed.YES
          else:
              cache: Cache = {}
-@@ -776,7 +857,7 @@ def reformat_one(
+@@ -777,7 +858,7 @@ def reformat_one(
                  if res_src_s in cache and cache[res_src_s] == get_cache_info(res_src):
                      changed = Changed.CACHED
              if changed is not Changed.CACHED and format_file_in_place(
@@ -168,7 +168,7 @@
              ):
                  changed = Changed.YES
              if (write_back is WriteBack.YES and changed is not Changed.CACHED) or (
-@@ -796,6 +877,8 @@ def format_file_in_place(
+@@ -797,6 +878,8 @@ def format_file_in_place(
      mode: Mode,
      write_back: WriteBack = WriteBack.NO,
      lock: Any = None,  # multiprocessing.Manager().Lock() is some crazy proxy
@@ -177,7 +177,7 @@
  ) -> bool:
      """Format file under `src` path. Return True if changed.
  
-@@ -815,7 +898,9 @@ def format_file_in_place(
+@@ -816,7 +899,9 @@ def format_file_in_place(
              header = buf.readline()
          src_contents, encoding, newline = decode_bytes(buf.read())
      try:
@@ -188,7 +188,7 @@
      except NothingChanged:
          return False
      except JSONDecodeError:
-@@ -860,6 +945,7 @@ def format_stdin_to_stdout(
+@@ -861,6 +946,7 @@ def format_stdin_to_stdout(
      content: Optional[str] = None,
      write_back: WriteBack = WriteBack.NO,
      mode: Mode,
@@ -196,7 +196,7 @@
  ) -> bool:
      """Format file on stdin. Return True if changed.
  
-@@ -906,7 +992,11 @@ def format_stdin_to_stdout(
+@@ -907,7 +993,11 @@ def format_stdin_to_stdout(
  
  
  def check_stability_and_equivalence(
@@ -209,7 +209,7 @@
  ) -> None:
      """Perform stability and equivalence checks.
  
-@@ -915,10 +1005,16 @@ def check_stability_and_equivalence(
+@@ -916,10 +1006,16 @@ def check_stability_and_equivalence(
      content differently.
      """
      assert_equivalent(src_contents, dst_contents)
@@ -228,7 +228,7 @@
      """Reformat contents of a file and return new contents.
  
      If `fast` is False, additionally confirm that the reformatted code is
-@@ -931,13 +1027,15 @@ def format_file_contents(src_contents: s
+@@ -929,13 +1025,15 @@ def format_file_contents(src_contents: s
      if mode.is_ipynb:
          dst_contents = format_ipynb_string(src_contents, fast=fast, mode=mode)
      else:
@@ -246,7 +246,7 @@
      return dst_contents
  
  
-@@ -1048,7 +1146,12 @@ def format_ipynb_string(src_contents: st
+@@ -1046,7 +1144,12 @@ def format_ipynb_string(src_contents: st
          raise NothingChanged
  
  
@@ -260,7 +260,7 @@
      """Reformat a string and return new contents.
  
      `mode` determines formatting options, such as how many characters per line are
-@@ -1077,17 +1180,28 @@ def format_str(src_contents: str, *, mod
+@@ -1075,17 +1178,28 @@ def format_str(src_contents: str, *, mod
      ) -> None:
          hey
  
@@ -292,7 +292,7 @@
      src_node = lib2to3_parse(src_contents.lstrip(), mode.target_versions)
      dst_blocks: List[LinesBlock] = []
      if mode.target_versions:
-@@ -1096,13 +1210,20 @@ def _format_str_once(src_contents: str,
+@@ -1094,13 +1208,20 @@ def _format_str_once(src_contents: str,
          future_imports = get_future_imports(src_node)
          versions = detect_target_versions(src_node, future_imports=future_imports)
  
@@ -303,7 +303,7 @@
          for feature in {Feature.PARENTHESIZED_CONTEXT_MANAGERS}
          if supports_feature(versions, feature)
      }
-     normalize_fmt_off(src_node, preview=mode.preview)
+     normalize_fmt_off(src_node)
 -    lines = LineGenerator(mode=mode, features=context_manager_features)
 +
 +    if lines:
@@ -314,7 +314,7 @@
      elt = EmptyLineTracker(mode=mode)
      split_line_features = {
          feature
-@@ -1110,7 +1231,7 @@ def _format_str_once(src_contents: str,
+@@ -1108,7 +1229,7 @@ def _format_str_once(src_contents: str,
          if supports_feature(versions, feature)
      }
      block: Optional[LinesBlock] = None
@@ -323,7 +323,7 @@
          block = elt.maybe_empty_lines(current_line)
          dst_blocks.append(block)
          for line in transform_line(
-@@ -1375,12 +1496,20 @@ def assert_equivalent(src: str, dst: str
+@@ -1373,12 +1494,20 @@ def assert_equivalent(src: str, dst: str
          ) from None
  
  
@@ -365,10 +365,12 @@
      Line,
      append_leaves,
      can_be_split,
-@@ -80,6 +81,13 @@ LeafID = int
+@@ -80,6 +81,15 @@ LeafID = int
  LN = Union[Leaf, Node]
  
  
++# Use a single-value enum as a sentinel object so that we could use it
++# inside a `Literal[]`.
 +class _Dedent(Enum):
 +    _DEDENT = auto()
 +
@@ -379,7 +381,7 @@
  class CannotSplit(CannotTransform):
      """A readable split that fits the allotted line length is impossible."""
  
-@@ -99,7 +107,9 @@ class LineGenerator(Visitor[Line]):
+@@ -99,7 +109,9 @@ class LineGenerator(Visitor[Line]):
          self.current_line: Line
          self.__post_init__()
  
@@ -390,7 +392,7 @@
          """Generate a line.
  
          If the line is empty, only emit if it makes sense.
-@@ -108,11 +118,20 @@ class LineGenerator(Visitor[Line]):
+@@ -108,11 +120,20 @@ class LineGenerator(Visitor[Line]):
          If any lines were generated, set up a new current_line.
          """
          if not self.current_line:
@@ -413,7 +415,7 @@
          yield complete_line
  
      def visit_default(self, node: LN) -> Iterator[Line]:
-@@ -138,7 +157,9 @@ class LineGenerator(Visitor[Line]):
+@@ -138,7 +159,9 @@ class LineGenerator(Visitor[Line]):
              normalize_prefix(node, inside_brackets=any_open_brackets)
              if self.mode.string_normalization and node.type == token.STRING:
                  node.value = normalize_string_prefix(node.value)
@@ -424,7 +426,7 @@
              if node.type == token.NUMBER:
                  normalize_numeric_literal(node)
              if node.type not in WHITESPACE:
-@@ -148,7 +169,10 @@ class LineGenerator(Visitor[Line]):
+@@ -148,7 +171,10 @@ class LineGenerator(Visitor[Line]):
      def visit_test(self, node: Node) -> Iterator[Line]:
          """Visit an `x if y else z` test"""
  
@@ -436,7 +438,7 @@
              already_parenthesized = (
                  node.prev_sibling and node.prev_sibling.type == token.LPAR
              )
-@@ -164,7 +188,7 @@ class LineGenerator(Visitor[Line]):
+@@ -164,7 +190,7 @@ class LineGenerator(Visitor[Line]):
      def visit_INDENT(self, node: Leaf) -> Iterator[Line]:
          """Increase indentation level, maybe yield a line."""
          # In blib2to3 INDENT never holds comments.
@@ -445,7 +447,7 @@
          yield from self.visit_default(node)
  
      def visit_DEDENT(self, node: Leaf) -> Iterator[Line]:
-@@ -179,7 +203,7 @@ class LineGenerator(Visitor[Line]):
+@@ -179,7 +205,7 @@ class LineGenerator(Visitor[Line]):
          yield from self.visit_default(node)
  
          # Finally, emit the dedent.
@@ -454,7 +456,7 @@
  
      def visit_stmt(
          self, node: Node, keywords: Set[str], parens: Set[str]
-@@ -278,9 +302,9 @@ class LineGenerator(Visitor[Line]):
+@@ -275,9 +301,9 @@ class LineGenerator(Visitor[Line]):
              if self.mode.is_pyi and is_stub_body(node):
                  yield from self.visit_default(node)
              else:
@@ -466,7 +468,7 @@
  
          else:
              if (
-@@ -371,10 +395,13 @@ class LineGenerator(Visitor[Line]):
+@@ -367,10 +393,13 @@ class LineGenerator(Visitor[Line]):
          yield from self.visit_default(node)
  
      def visit_STRING(self, leaf: Leaf) -> Iterator[Line]:
@@ -481,19 +483,19 @@
 +        if is_docstring(leaf, self.mode.is_pyink) and "\\\n" not in leaf.value:
              # We're ignoring docstrings with backslash newline escapes because changing
              # indentation of those changes the AST representation of the code.
-             if Preview.normalize_docstring_quotes_and_prefixes_properly in self.mode:
-@@ -389,7 +416,9 @@ class LineGenerator(Visitor[Line]):
-                     # formatting as visit_default() is called *after*. To avoid a
-                     # situation where this function formats a docstring differently on
-                     # the second pass, normalize it early.
--                    docstring = normalize_string_quotes(docstring)
-+                    docstring = normalize_string_quotes(
-+                        docstring, preferred_quote=self.mode.preferred_quote
-+                    )
-                 else:
-                     docstring = leaf.value
+             if self.mode.string_normalization:
+@@ -381,7 +410,9 @@ class LineGenerator(Visitor[Line]):
+                 # formatting as visit_default() is called *after*. To avoid a
+                 # situation where this function formats a docstring differently on
+                 # the second pass, normalize it early.
+-                docstring = normalize_string_quotes(docstring)
++                docstring = normalize_string_quotes(
++                    docstring, preferred_quote=self.mode.preferred_quote
++                )
              else:
-@@ -406,7 +435,7 @@ class LineGenerator(Visitor[Line]):
+                 docstring = leaf.value
+             prefix = get_string_prefix(docstring)
+@@ -395,7 +426,7 @@ class LineGenerator(Visitor[Line]):
              quote_len = 1 if docstring[1] != quote_char else 3
              docstring = docstring[quote_len:-quote_len]
              docstring_started_empty = not docstring
@@ -502,7 +504,7 @@
  
              if is_multiline_string(leaf):
                  docstring = fix_docstring(docstring, indent)
-@@ -493,7 +522,8 @@ class LineGenerator(Visitor[Line]):
+@@ -476,7 +507,8 @@ class LineGenerator(Visitor[Line]):
          self.visit_classdef = partial(v, keywords={"class"}, parens=Ø)
          self.visit_expr_stmt = partial(v, keywords=Ø, parens=ASSIGNMENTS)
          self.visit_return_stmt = partial(v, keywords={"return"}, parens={"return"})
@@ -512,7 +514,7 @@
          self.visit_del_stmt = partial(v, keywords=Ø, parens={"del"})
          self.visit_async_funcdef = self.visit_async_stmt
          self.visit_decorated = self.visit_decorators
-@@ -520,10 +550,11 @@ def transform_line(
+@@ -503,10 +535,11 @@ def transform_line(
  
      ll = mode.line_length
      sn = mode.string_normalization
@@ -528,7 +530,7 @@
  
      transformers: List[Transformer]
      if (
-@@ -711,8 +742,7 @@ def _first_right_hand_split(
+@@ -694,8 +727,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> _RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -538,7 +540,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -741,12 +771,51 @@ def _first_right_hand_split(
+@@ -724,12 +756,51 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -593,7 +595,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -904,7 +973,7 @@ def bracket_split_build_line(
+@@ -887,7 +958,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -602,7 +604,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1440,7 +1509,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1417,7 +1488,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -690,7 +692,7 @@
      def contains_multiline_strings(self) -> bool:
          return any(is_multiline_string(leaf) for leaf in self.leaves)
  
-@@ -434,7 +468,7 @@ class Line:
+@@ -430,7 +464,7 @@ class Line:
          if not self:
              return "\n"
  
@@ -699,7 +701,7 @@
          leaves = iter(self.leaves)
          first = next(leaves)
          res = f"{first.prefix}{indent}{first.value}"
-@@ -485,7 +519,7 @@ class EmptyLineTracker:
+@@ -481,7 +515,7 @@ class EmptyLineTracker:
      mode: Mode
      previous_line: Optional[Line] = None
      previous_block: Optional[LinesBlock] = None
@@ -708,7 +710,7 @@
      semantic_leading_comment: Optional[LinesBlock] = None
  
      def maybe_empty_lines(self, current_line: Line) -> LinesBlock:
-@@ -530,7 +564,7 @@ class EmptyLineTracker:
+@@ -526,7 +560,7 @@ class EmptyLineTracker:
  
      def _maybe_empty_lines(self, current_line: Line) -> Tuple[int, int]:
          max_allowed = 1
@@ -717,7 +719,7 @@
              max_allowed = 1 if self.mode.is_pyi else 2
          if current_line.leaves:
              # Consume the first leaf's extra newlines.
-@@ -541,7 +575,7 @@ class EmptyLineTracker:
+@@ -537,7 +571,7 @@ class EmptyLineTracker:
          else:
              before = 0
          depth = current_line.depth
@@ -726,7 +728,7 @@
              if self.mode.is_pyi:
                  assert self.previous_line is not None
                  if depth and not current_line.is_def and self.previous_line.is_def:
-@@ -580,8 +614,9 @@ class EmptyLineTracker:
+@@ -576,8 +610,9 @@ class EmptyLineTracker:
          if (
              self.previous_line
              and self.previous_line.is_import
@@ -738,10 +740,11 @@
          ):
              return (before or 1), 0
  
-@@ -593,6 +628,14 @@ class EmptyLineTracker:
+@@ -588,6 +623,14 @@ class EmptyLineTracker:
+         ):
              return before, 1
  
-         if (
++        if (
 +            self.mode.is_pyink
 +            and self.previous_line
 +            and self.previous_line.is_class
@@ -749,11 +752,10 @@
 +        ):
 +            return before, 0
 +
-+        if (
-             Preview.remove_block_trailing_newline in current_line.mode
-             and self.previous_line
-             and self.previous_line.opens_block
-@@ -616,15 +659,16 @@ class EmptyLineTracker:
+         if self.previous_line and self.previous_line.opens_block:
+             return 0, 0
+         return before, 0
+@@ -608,15 +651,16 @@ class EmptyLineTracker:
  
              return 0, 0
  
@@ -773,7 +775,7 @@
              and before == 0
          ):
              slc = self.semantic_leading_comment
-@@ -643,9 +687,9 @@ class EmptyLineTracker:
+@@ -633,9 +677,9 @@ class EmptyLineTracker:
  
          if self.mode.is_pyi:
              if current_line.is_class or self.previous_line.is_class:
@@ -785,7 +787,7 @@
                      newlines = 1
                  elif current_line.is_stub_class and self.previous_line.is_stub_class:
                      # No blank line between classes with an empty body
-@@ -663,7 +707,7 @@ class EmptyLineTracker:
+@@ -653,7 +697,7 @@ class EmptyLineTracker:
                      # Blank line between a block of functions (maybe with preceding
                      # decorators) and a block of non-functions
                      newlines = 1
@@ -794,7 +796,7 @@
                  newlines = 1
              else:
                  newlines = 0
-@@ -718,8 +762,12 @@ def is_line_short_enough(line: Line, *,
+@@ -708,8 +752,12 @@ def is_line_short_enough(line: Line, *,
      """
      if not line_str:
          line_str = line_to_string(line)
@@ -808,7 +810,7 @@
          and "\n" not in line_str  # multiline strings
          and not line.contains_standalone_comments()
      )
-@@ -831,7 +879,7 @@ def can_omit_invisible_parens(
+@@ -821,7 +869,7 @@ def can_omit_invisible_parens(
  def _can_omit_opening_paren(line: Line, *, first: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
      remainder = False
@@ -817,7 +819,7 @@
      _index = -1
      for _index, leaf, leaf_length in line.enumerate_with_length():
          if leaf.type in CLOSING_BRACKETS and leaf.opening_bracket is first:
-@@ -855,7 +903,7 @@ def _can_omit_opening_paren(line: Line,
+@@ -845,7 +893,7 @@ def _can_omit_opening_paren(line: Line,
  
  def _can_omit_closing_paren(line: Line, *, last: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
@@ -837,7 +839,7 @@
  from warnings import warn
  
  if sys.version_info < (3, 8):
-@@ -176,11 +176,26 @@ class Deprecated(UserWarning):
+@@ -168,11 +168,26 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
  
@@ -864,7 +866,7 @@
      is_pyi: bool = False
      is_ipynb: bool = False
      skip_source_first_line: bool = False
-@@ -188,6 +203,8 @@ class Mode:
+@@ -180,6 +195,8 @@ class Mode:
      experimental_string_processing: bool = False
      python_cell_magics: Set[str] = field(default_factory=set)
      preview: bool = False
@@ -873,7 +875,7 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -222,12 +239,25 @@ class Mode:
+@@ -214,12 +231,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
@@ -990,7 +992,7 @@
  classifiers = [
    "Development Status :: 5 - Production/Stable",
    "Environment :: Console",
-@@ -70,47 +42,34 @@ dependencies = [
+@@ -71,47 +43,34 @@ dependencies = [
    "tomli>=1.1.0; python_version < '3.11'",
    "typed-ast>=1.4.2; python_version < '3.8' and implementation_name == 'cpython'",
    "typing_extensions>=3.10.0.0; python_version < '3.10'",
@@ -1044,7 +1046,7 @@
  [tool.hatch.build.targets.wheel]
  only-include = ["src"]
  sources = ["src"]
-@@ -119,7 +78,6 @@ sources = ["src"]
+@@ -120,7 +79,6 @@ sources = ["src"]
  # Option below requires `tests/optional.py`
  addopts = "--strict-config --strict-markers"
  optional-tests = [
@@ -1107,7 +1109,7 @@
 +pyink = false
 --- a/tests/test_black.py
 +++ b/tests/test_black.py
-@@ -1287,7 +1287,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1288,7 +1288,7 @@ class BlackTestCase(BlackBaseTestCase):
                  report=report,
              )
              fsts.assert_called_once_with(
@@ -1116,7 +1118,7 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -1313,6 +1313,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1314,6 +1314,7 @@ class BlackTestCase(BlackBaseTestCase):
                  fast=True,
                  write_back=pyink.WriteBack.YES,
                  mode=replace(DEFAULT_MODE, is_pyi=True),
@@ -1124,7 +1126,7 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -1338,6 +1339,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1339,6 +1340,7 @@ class BlackTestCase(BlackBaseTestCase):
                  fast=True,
                  write_back=pyink.WriteBack.YES,
                  mode=replace(DEFAULT_MODE, is_ipynb=True),
@@ -1132,7 +1134,7 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -2392,6 +2394,113 @@ class TestFileCollection:
+@@ -2459,6 +2461,113 @@ class TestFileCollection:
              stdin_filename=stdin_filename,
          )
  
@@ -1248,8 +1250,8 @@
      with open(pyink.__file__, "r", encoding="utf-8") as _bf:
 --- a/tests/test_format.py
 +++ b/tests/test_format.py
-@@ -59,6 +59,15 @@ def test_preview_minimum_python_310_form
-     assert_format(source, expected, mode, minimum_version=(3, 10))
+@@ -43,6 +43,15 @@ def test_preview_format(filename: str) -
+     check_file("preview", filename, pyink.Mode(preview=True))
  
  
 +@pytest.mark.parametrize("filename", all_data_cases("pyink"))
