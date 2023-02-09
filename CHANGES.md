@@ -6,6 +6,8 @@ All notable changes to Pyink are recorded here.
 
 * Fixed a bug where a module docstring ends with a line that's `LineLength-3`
   to `LineLength` long, an extra empty line was added.
+* Do not explode immediately nested literals that have a trailing comma in the
+  body.
 
 ## 23.1.0
 

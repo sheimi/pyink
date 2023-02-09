@@ -66,3 +66,41 @@ func_call_with_dict = frozenset(
 func_call_multiple_levels = array(
     [[1001, 1002, 1003, 1004, 1005, 1006, 1007, 1008, 1009, 1010, 1011, 1012]]
 )
+
+
+# Make sure single- and two- item literals work as expected.
+variable.method_call({
+    "this_is_a_very_very_long_key": "this_is_a_very_very_very_long_value",
+})
+
+variable.method_call({
+    "this_is_a_very_very_long_key1": "this_is_a_very_very_very_long_value1",
+    "this_is_a_very_very_long_key2": "this_is_a_very_very_very_long_value2",
+})
+
+variable.method_call([
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+])
+
+variable.method_call([
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+])
+
+variable.method_call({
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+})
+
+variable.method_call({
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+})
+
+variable.method_call((
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+))
+
+variable.method_call((
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+    "this_is_a_very_very_very_very_very_very_very_very_very_very_long_value",
+))

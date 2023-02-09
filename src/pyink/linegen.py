@@ -781,9 +781,11 @@ def _first_right_hand_split(
                 opening_brackets[0],
                 component=_BracketSplitComponent.body,
             )
-            if inner_body.should_split_rhs:
-                # Only when the inner body itself will be split, should we prefer
-                # not break immediately nested brackets.
+            if inner_body.should_split_rhs or (
+                inner_body_leaves and inner_body_leaves[-1].type == token.COMMA
+            ):
+                # Only when the inner body itself will be split or ends with a comma,
+                # should we prefer not break immediately nested brackets.
                 body_leaves = inner_body_leaves
                 head_leaves.extend(inner_opening_brackets)
                 tail_leaves = inner_closing_brackets + tail_leaves
