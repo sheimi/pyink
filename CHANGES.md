@@ -4,8 +4,15 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
+* Nothing notable unreleased.
+
+## 23.1.1
+
+This release is based on https://github.com/psf/black/commit/9c8464ca7ddd48d1c19112d895ae12d783f01563.
+
 * Fixed a bug where a module docstring ends with a line that's `LineLength-3`
   to `LineLength` long, an extra empty line was added.
+* Fixed a bug when running *Pyink* on Python 3.8 and earlier (#3).
 * Do not explode immediately nested literals that have a trailing comma in the
   body.
 
