@@ -59,7 +59,7 @@ jupyter = [
 pyink = "pyink:patched_main"
 
 [project.urls]
-Changelog = "https://github.com/google/pyink/blob/main/CHANGES.md"
+Changelog = "https://github.com/google/pyink/blob/pyink/CHANGES.md"
 Homepage = "https://github.com/google/pyink"
 
 [tool.hatch.version]
