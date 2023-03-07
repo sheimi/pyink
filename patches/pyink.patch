@@ -144,7 +144,7 @@
 +    mode: Mode,
 +    report: "Report",
 +    *,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
  ) -> None:
      """Reformat a single file under `src` without spawning child processes.
  
@@ -173,7 +173,7 @@
      write_back: WriteBack = WriteBack.NO,
      lock: Any = None,  # multiprocessing.Manager().Lock() is some crazy proxy
 +    *,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
  ) -> bool:
      """Format file under `src` path. Return True if changed.
  
@@ -192,7 +192,7 @@
      content: Optional[str] = None,
      write_back: WriteBack = WriteBack.NO,
      mode: Mode,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
  ) -> bool:
      """Format file on stdin. Return True if changed.
  
@@ -205,7 +205,7 @@
 +    dst_contents: str,
 +    *,
 +    mode: Mode,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
  ) -> None:
      """Perform stability and equivalence checks.
  
@@ -223,7 +223,7 @@
 +    *,
 +    fast: bool,
 +    mode: Mode,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
 +) -> FileContent:
      """Reformat contents of a file and return new contents.
  
@@ -255,7 +255,7 @@
 +    src_contents: str,
 +    *,
 +    mode: Mode,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
 +) -> str:
      """Reformat a string and return new contents.
  
@@ -287,7 +287,7 @@
 +    src_contents: str,
 +    *,
 +    mode: Mode,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
 +) -> str:
      src_node = lib2to3_parse(src_contents.lstrip(), mode.target_versions)
      dst_blocks: List[LinesBlock] = []
@@ -333,7 +333,7 @@
 +    dst: str,
 +    mode: Mode,
 +    *,
-+    lines: Optional[Collection[tuple[int, int]]] = None,
++    lines: Optional[Collection[Tuple[int, int]]] = None,
 +) -> None:
      """Raise AssertionError if `dst` reformats differently the second time."""
      # We shouldn't call format_str() here, because that formats the string
@@ -543,7 +543,7 @@
  
      transformers: List[Transformer]
      if (
-@@ -694,8 +731,7 @@ def _first_right_hand_split(
+@@ -696,8 +733,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> _RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -553,7 +553,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -724,12 +760,53 @@ def _first_right_hand_split(
+@@ -726,12 +762,53 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -610,7 +610,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -887,7 +964,7 @@ def bracket_split_build_line(
+@@ -889,7 +966,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -619,7 +619,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1417,7 +1494,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1447,7 +1524,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -854,7 +854,7 @@
  from warnings import warn
  
  if sys.version_info < (3, 8):
-@@ -168,11 +168,26 @@ class Deprecated(UserWarning):
+@@ -169,11 +169,26 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
  
@@ -881,7 +881,7 @@
      is_pyi: bool = False
      is_ipynb: bool = False
      skip_source_first_line: bool = False
-@@ -180,6 +195,8 @@ class Mode:
+@@ -181,6 +196,8 @@ class Mode:
      experimental_string_processing: bool = False
      python_cell_magics: Set[str] = field(default_factory=set)
      preview: bool = False
@@ -890,7 +890,7 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -214,12 +231,25 @@ class Mode:
+@@ -215,12 +232,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
@@ -1042,7 +1042,7 @@
 -  { path = "README.md" },
 -  { path = "CHANGES.md" },
 -]
-+Changelog = "https://github.com/google/pyink/blob/main/CHANGES.md"
++Changelog = "https://github.com/google/pyink/blob/pyink/CHANGES.md"
 +Homepage = "https://github.com/google/pyink"
  
  [tool.hatch.version]
@@ -1296,13 +1296,13 @@
  
  from pyink.comments import contains_pragma_comment
 -from pyink.lines import Line, append_leaves
--from pyink.mode import Feature
+-from pyink.mode import Feature, Mode
 +from pyink.lines import Indentation, Line, append_leaves
-+from pyink.mode import Feature, Quote
++from pyink.mode import Feature, Mode, Quote
  from pyink.nodes import (
      CLOSING_BRACKETS,
      OPENING_BRACKETS,
-@@ -190,9 +190,12 @@ class StringTransformer(ABC):
+@@ -192,9 +192,12 @@ class StringTransformer(ABC):
  
      # Ideally this would be a dataclass, but unfortunately mypyc breaks when used with
      # `abc.ABC`.
@@ -1316,7 +1316,7 @@
  
      @abstractmethod
      def do_match(self, line: Line) -> TMatchResult:
-@@ -645,7 +648,9 @@ class StringMerger(StringTransformer, Cu
+@@ -649,7 +652,9 @@ class StringMerger(StringTransformer, Cu
  
          S_leaf = Leaf(token.STRING, S)
          if self.normalize_strings:
@@ -1327,7 +1327,7 @@
  
          # Fill the 'custom_splits' list with the appropriate CustomSplit objects.
          temp_string = S_leaf.value[len(prefix) + 1 : -1]
-@@ -1084,7 +1089,7 @@ class BaseStringSplitter(StringTransform
+@@ -1088,7 +1093,7 @@ class BaseStringSplitter(StringTransform
          #   NN: The leaf that is after N.
  
          # WMA4 the whitespace at the beginning of the line.
@@ -1336,7 +1336,7 @@
  
          if is_valid_index(string_idx - 1):
              p_idx = string_idx - 1
-@@ -1422,7 +1427,7 @@ class StringSplitter(BaseStringSplitter,
+@@ -1426,7 +1431,7 @@ class StringSplitter(BaseStringSplitter,
                  line we will construct.
              """
              result = self.line_length
@@ -1345,7 +1345,7 @@
              result -= 1 if ends_with_comma else 0
              result -= string_op_leaves_length
              return result
-@@ -1433,11 +1438,11 @@ class StringSplitter(BaseStringSplitter,
+@@ -1437,11 +1442,11 @@ class StringSplitter(BaseStringSplitter,
          # The last index of a string of length N is N-1.
          max_break_idx -= 1
          # Leading whitespace is not present in the string value (e.g. Leaf.value).
@@ -1359,7 +1359,7 @@
              )
              return
  
-@@ -1730,7 +1735,9 @@ class StringSplitter(BaseStringSplitter,
+@@ -1734,7 +1739,9 @@ class StringSplitter(BaseStringSplitter,
  
      def _maybe_normalize_string_quotes(self, leaf: Leaf) -> None:
          if self.normalize_strings:
@@ -1370,7 +1370,7 @@
  
      def _normalize_f_string(self, string: str, prefix: str) -> str:
          """
-@@ -1850,7 +1857,8 @@ class StringParenWrapper(BaseStringSplit
+@@ -1854,7 +1861,8 @@ class StringParenWrapper(BaseStringSplit
              # If the string has no spaces...
              if " " not in string_value:
                  # And will still violate the line length limit when split...
@@ -1380,7 +1380,7 @@
                  if len(string_value) > max_string_length:
                      # And has no associated custom splits...
                      if not self.has_custom_splits(string_value):
-@@ -2096,7 +2104,7 @@ class StringParenWrapper(BaseStringSplit
+@@ -2100,7 +2108,7 @@ class StringParenWrapper(BaseStringSplit
          string_value = LL[string_idx].value
          string_line = Line(
              mode=line.mode,
