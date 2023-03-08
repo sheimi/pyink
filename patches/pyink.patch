@@ -349,7 +349,7 @@
 --- a/linegen.py
 +++ b/linegen.py
 @@ -5,7 +5,7 @@ import sys
- from dataclasses import dataclass
+ from dataclasses import dataclass, replace
  from enum import Enum, auto
  from functools import partial, wraps
 -from typing import Collection, Iterator, List, Optional, Set, Union, cast
@@ -543,7 +543,7 @@
  
      transformers: List[Transformer]
      if (
-@@ -696,8 +733,7 @@ def _first_right_hand_split(
+@@ -692,8 +729,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> _RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -553,7 +553,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -726,12 +762,53 @@ def _first_right_hand_split(
+@@ -722,12 +758,53 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -610,7 +610,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -889,7 +966,7 @@ def bracket_split_build_line(
+@@ -886,7 +963,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -619,7 +619,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1447,7 +1524,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1444,7 +1521,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -630,16 +630,17 @@
      inner_brackets: Set[LeafID] = set()
 --- a/lines.py
 +++ b/lines.py
-@@ -1,4 +1,6 @@
+@@ -1,5 +1,7 @@
 +from enum import Enum, auto
  import itertools
+ import math
 +import re
  import sys
  from dataclasses import dataclass, field
  from typing import (
-@@ -38,13 +40,28 @@ T = TypeVar("T")
- Index = int
+@@ -41,13 +43,28 @@ Index = int
  LeafID = int
+ LN = Union[Leaf, Node]
  
 +# This regex should contain a single capture group capturing the entire match.
 +_PRAGMA_REGEX = re.compile("( *# (?:pylint|pytype):)")
@@ -667,7 +668,7 @@
      leaves: List[Leaf] = field(default_factory=list)
      # keys ordered like `leaves`
      comments: Dict[LeafID, List[Leaf]] = field(default_factory=dict)
-@@ -53,6 +70,9 @@ class Line:
+@@ -56,6 +73,9 @@ class Line:
      should_split_rhs: bool = False
      magic_trailing_comma: Optional[Leaf] = None
  
@@ -677,7 +678,7 @@
      def append(
          self, leaf: Leaf, preformatted: bool = False, track_bracket: bool = False
      ) -> None:
-@@ -93,7 +113,7 @@ class Line:
+@@ -96,7 +116,7 @@ class Line:
          Raises ValueError when any `leaf` is appended after a standalone comment
          or when a standalone comment is not the first leaf on the line.
          """
@@ -686,7 +687,7 @@
              if self.is_comment:
                  raise ValueError("cannot append to standalone comments")
  
-@@ -263,6 +283,20 @@ class Line:
+@@ -266,6 +286,20 @@ class Line:
  
          return False
  
@@ -707,7 +708,7 @@
      def contains_multiline_strings(self) -> bool:
          return any(is_multiline_string(leaf) for leaf in self.leaves)
  
-@@ -430,7 +464,7 @@ class Line:
+@@ -433,7 +467,7 @@ class Line:
          if not self:
              return "\n"
  
@@ -716,7 +717,7 @@
          leaves = iter(self.leaves)
          first = next(leaves)
          res = f"{first.prefix}{indent}{first.value}"
-@@ -481,7 +515,7 @@ class EmptyLineTracker:
+@@ -484,7 +518,7 @@ class EmptyLineTracker:
      mode: Mode
      previous_line: Optional[Line] = None
      previous_block: Optional[LinesBlock] = None
@@ -725,7 +726,7 @@
      semantic_leading_comment: Optional[LinesBlock] = None
  
      def maybe_empty_lines(self, current_line: Line) -> LinesBlock:
-@@ -526,7 +560,7 @@ class EmptyLineTracker:
+@@ -529,7 +563,7 @@ class EmptyLineTracker:
  
      def _maybe_empty_lines(self, current_line: Line) -> Tuple[int, int]:
          max_allowed = 1
@@ -734,7 +735,7 @@
              max_allowed = 1 if self.mode.is_pyi else 2
          if current_line.leaves:
              # Consume the first leaf's extra newlines.
-@@ -537,7 +571,7 @@ class EmptyLineTracker:
+@@ -540,7 +574,7 @@ class EmptyLineTracker:
          else:
              before = 0
          depth = current_line.depth
@@ -743,7 +744,7 @@
              if self.mode.is_pyi:
                  assert self.previous_line is not None
                  if depth and not current_line.is_def and self.previous_line.is_def:
-@@ -576,8 +610,9 @@ class EmptyLineTracker:
+@@ -579,8 +613,9 @@ class EmptyLineTracker:
          if (
              self.previous_line
              and self.previous_line.is_import
@@ -755,7 +756,7 @@
          ):
              return (before or 1), 0
  
-@@ -588,6 +623,14 @@ class EmptyLineTracker:
+@@ -591,6 +626,14 @@ class EmptyLineTracker:
          ):
              return before, 1
  
@@ -770,7 +771,7 @@
          if self.previous_line and self.previous_line.opens_block:
              return 0, 0
          return before, 0
-@@ -608,15 +651,16 @@ class EmptyLineTracker:
+@@ -611,15 +654,16 @@ class EmptyLineTracker:
  
              return 0, 0
  
@@ -790,7 +791,7 @@
              and before == 0
          ):
              slc = self.semantic_leading_comment
-@@ -633,9 +677,9 @@ class EmptyLineTracker:
+@@ -636,9 +680,9 @@ class EmptyLineTracker:
  
          if self.mode.is_pyi:
              if current_line.is_class or self.previous_line.is_class:
@@ -802,7 +803,7 @@
                      newlines = 1
                  elif current_line.is_stub_class and self.previous_line.is_stub_class:
                      # No blank line between classes with an empty body
-@@ -653,7 +697,7 @@ class EmptyLineTracker:
+@@ -656,7 +700,7 @@ class EmptyLineTracker:
                      # Blank line between a block of functions (maybe with preceding
                      # decorators) and a block of non-functions
                      newlines = 1
@@ -811,7 +812,7 @@
                  newlines = 1
              else:
                  newlines = 0
-@@ -708,8 +752,12 @@ def is_line_short_enough(line: Line, *,
+@@ -714,10 +758,14 @@ def is_line_short_enough(  # noqa: C901
      """
      if not line_str:
          line_str = line_to_string(line)
@@ -819,13 +820,24 @@
 +        effective_length = len(line_str) - line.trailing_pragma_comment_length()
 +    else:
 +        effective_length = len(line_str)
-     return (
--        len(line_str) <= line_length
-+        effective_length <= line_length
-         and "\n" not in line_str  # multiline strings
-         and not line.contains_standalone_comments()
-     )
-@@ -821,7 +869,7 @@ def can_omit_invisible_parens(
+ 
+     if Preview.multiline_string_handling not in mode:
+         return (
+-            len(line_str) <= mode.line_length
++            effective_length <= mode.line_length
+             and "\n" not in line_str  # multiline strings
+             and not line.contains_standalone_comments()
+         )
+@@ -726,7 +774,7 @@ def is_line_short_enough(  # noqa: C901
+         return False
+     if "\n" not in line_str:
+         # No multiline strings (MLS) present
+-        return len(line_str) <= mode.line_length
++        return effective_length <= mode.line_length
+ 
+     first, *_, last = line_str.split("\n")
+     if len(first) > mode.line_length or len(last) > mode.line_length:
+@@ -899,7 +947,7 @@ def can_omit_invisible_parens(
  def _can_omit_opening_paren(line: Line, *, first: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
      remainder = False
@@ -834,7 +846,7 @@
      _index = -1
      for _index, leaf, leaf_length in line.enumerate_with_length():
          if leaf.type in CLOSING_BRACKETS and leaf.opening_bracket is first:
-@@ -845,7 +893,7 @@ def _can_omit_opening_paren(line: Line,
+@@ -923,7 +971,7 @@ def _can_omit_opening_paren(line: Line,
  
  def _can_omit_closing_paren(line: Line, *, last: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
@@ -854,7 +866,7 @@
  from warnings import warn
  
  if sys.version_info < (3, 8):
-@@ -169,11 +169,26 @@ class Deprecated(UserWarning):
+@@ -170,11 +170,26 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
  
@@ -881,7 +893,7 @@
      is_pyi: bool = False
      is_ipynb: bool = False
      skip_source_first_line: bool = False
-@@ -181,6 +196,8 @@ class Mode:
+@@ -182,6 +197,8 @@ class Mode:
      experimental_string_processing: bool = False
      python_cell_magics: Set[str] = field(default_factory=set)
      preview: bool = False
@@ -890,7 +902,7 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -215,12 +232,25 @@ class Mode:
+@@ -216,12 +233,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
