@@ -161,7 +161,7 @@ def _convert_unchanged_line_by_line(node: Node, lines_set: Set[int]):
                 assert False, "Unexpected empty nodes in the match_stmt"
                 continue
             if not _get_line_range(nodes_to_ignore).intersection(lines_set):
-                _convert_nodes_to_standardalone_comment(nodes_to_ignore)
+                _convert_nodes_to_standardalone_comment(nodes_to_ignore, newline=leaf)
         elif leaf.parent and leaf.parent.type == syms.suite:
             # The `suite` node is defined as:
             #   suite: simple_stmt | NEWLINE INDENT stmt+ DEDENT
@@ -185,7 +185,7 @@ def _convert_unchanged_line_by_line(node: Node, lines_set: Set[int]):
             ):
                 nodes_to_ignore.insert(0, grandparent.prev_sibling)
             if not _get_line_range(nodes_to_ignore).intersection(lines_set):
-                _convert_nodes_to_standardalone_comment(nodes_to_ignore)
+                _convert_nodes_to_standardalone_comment(nodes_to_ignore, newline=leaf)
         else:
             ancestor = _furthest_ancestor_with_last_leaf(leaf)
             # Consider multiple decorators as a whole block, as their
@@ -236,7 +236,7 @@ def _convert_node_to_standalone_comment(node: LN):
         )
 
 
-def _convert_nodes_to_standardalone_comment(nodes: Sequence[LN]):
+def _convert_nodes_to_standardalone_comment(nodes: Sequence[LN], *, newline: Leaf):
     """Convert nodes to STANDALONE_COMMENT by modifying the tree inline."""
     if not nodes:
         return
@@ -247,6 +247,10 @@ def _convert_nodes_to_standardalone_comment(nodes: Sequence[LN]):
     prefix = first_leaf.prefix
     first_leaf.prefix = ""
     value = "".join(str(node) for node in nodes)
+    # The prefix comment on the NEWLINE leaf is the trailing comment of the statement.
+    if newline.prefix:
+        value += newline.prefix
+        newline.prefix = ""
     index = nodes[0].remove()
     for node in nodes[1:]:
         node.remove()
