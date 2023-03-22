@@ -30,11 +30,12 @@ from pyink.nodes import (
     is_multiline_string,
     is_one_sequence_between,
     is_type_comment,
-    is_with_stmt,
+    is_with_or_async_with_stmt,
     replace_child,
     syms,
     whitespace,
 )
+from pyink.strings import str_width
 from blib2to3.pgen2 import token
 from blib2to3.pytree import Leaf, Node
 
@@ -144,9 +145,9 @@ class Line:
         return bool(self) and is_import(self.leaves[0])
 
     @property
-    def is_with_stmt(self) -> bool:
+    def is_with_or_async_with_stmt(self) -> bool:
         """Is this a with_stmt line?"""
-        return bool(self) and is_with_stmt(self.leaves[0])
+        return bool(self) and is_with_or_async_with_stmt(self.leaves[0])
 
     @property
     def is_class(self) -> bool:
@@ -214,6 +215,26 @@ class Line:
         if len(self.leaves) == 0:
             return False
         return self.leaves[-1].type == token.COLON
+
+    def is_fmt_pass_converted(
+        self, *, first_leaf_matches: Optional[Callable[[Leaf], bool]] = None
+    ) -> bool:
+        """Is this line converted from fmt off/skip code?
+
+        If first_leaf_matches is not None, it only returns True if the first
+        leaf of converted code matches.
+        """
+        if len(self.leaves) != 1:
+            return False
+        leaf = self.leaves[0]
+        if (
+            leaf.type != STANDALONE_COMMENT
+            or leaf.fmt_pass_converted_first_leaf is None
+        ):
+            return False
+        return first_leaf_matches is None or first_leaf_matches(
+            leaf.fmt_pass_converted_first_leaf
+        )
 
     def contains_standalone_comments(self, depth_limit: int = sys.maxsize) -> bool:
         """If so, needs to be split before emitting."""
@@ -535,7 +556,7 @@ class EmptyLineTracker:
     mode: Mode
     previous_line: Optional[Line] = None
     previous_block: Optional[LinesBlock] = None
-    previous_defs: List[Tuple[Indentation, ...]] = field(default_factory=list)
+    previous_defs: List[Line] = field(default_factory=list)
     semantic_leading_comment: Optional[LinesBlock] = None
 
     def maybe_empty_lines(self, current_line: Line) -> LinesBlock:
@@ -591,12 +612,18 @@ class EmptyLineTracker:
         else:
             before = 0
         depth = current_line.depth
-        while self.previous_defs and len(self.previous_defs[-1]) >= len(depth):
+        while self.previous_defs and len(self.previous_defs[-1].depth) >= len(depth):
             if self.mode.is_pyi:
                 assert self.previous_line is not None
                 if depth and not current_line.is_def and self.previous_line.is_def:
                     # Empty lines between attributes and methods should be preserved.
                     before = min(1, before)
+                elif (
+                    Preview.blank_line_after_nested_stub_class in self.mode
+                    and self.previous_defs[-1].is_class
+                    and not self.previous_defs[-1].is_stub_class
+                ):
+                    before = 1
                 elif depth:
                     before = 0
                 else:
@@ -606,7 +633,7 @@ class EmptyLineTracker:
                     before = 1
                 elif (
                     not depth
-                    and self.previous_defs[-1]
+                    and self.previous_defs[-1].depth
                     and current_line.leaves[-1].type == token.COLON
                     and (
                         current_line.leaves[0].value
@@ -632,6 +659,7 @@ class EmptyLineTracker:
             and self.previous_line.is_import
             # Should not add empty lines before a STANDALONE_COMMENT.
             and not (current_line.is_import or current_line.is_comment)
+            and not current_line.is_fmt_pass_converted(first_leaf_matches=is_import)
             and len(depth) == len(self.previous_line.depth)
         ):
             return (before or 1), 0
@@ -659,7 +687,7 @@ class EmptyLineTracker:
         self, current_line: Line, before: int
     ) -> Tuple[int, int]:
         if not current_line.is_decorator:
-            self.previous_defs.append(current_line.depth)
+            self.previous_defs.append(current_line)
         if self.previous_line is None:
             # Don't insert empty lines before the first line in the file.
             return 0, 0
@@ -775,10 +803,12 @@ def is_line_short_enough(  # noqa: C901
     """
     if not line_str:
         line_str = line_to_string(line)
+
+    width = str_width if mode.preview else len
     if line.mode.is_pyink:
-        effective_length = len(line_str) - line.trailing_pragma_comment_length()
+        effective_length = width(line_str) - line.trailing_pragma_comment_length()
     else:
-        effective_length = len(line_str)
+        effective_length = width(line_str)
 
     if Preview.multiline_string_handling not in mode:
         return (
@@ -794,7 +824,7 @@ def is_line_short_enough(  # noqa: C901
         return effective_length <= mode.line_length
 
     first, *_, last = line_str.split("\n")
-    if len(first) > mode.line_length or len(last) > mode.line_length:
+    if width(first) > mode.line_length or width(last) > mode.line_length:
         return False
 
     # Traverse the AST to examine the context of the multiline string (MLS),
@@ -920,7 +950,7 @@ def can_omit_invisible_parens(
         if (
             Preview.wrap_multiple_context_managers_in_parens in line.mode
             and max_priority == COMMA_PRIORITY
-            and rhs.head.is_with_stmt
+            and rhs.head.is_with_or_async_with_stmt
         ):
             # For two context manager with statements, the optional parentheses read
             # better. In this case, `rhs.body` is the context managers part of
