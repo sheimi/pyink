@@ -756,20 +756,35 @@
              if self.mode.is_pyi:
                  assert self.previous_line is not None
                  if depth and not current_line.is_def and self.previous_line.is_def:
-@@ -623,9 +657,10 @@ class EmptyLineTracker:
+@@ -622,10 +656,25 @@ class EmptyLineTracker:
+ 
          if (
              self.previous_line
-             and self.previous_line.is_import
--            and not current_line.is_import
-+            # Should not add empty lines before a STANDALONE_COMMENT.
-+            and not (current_line.is_import or current_line.is_comment)
+-            and self.previous_line.is_import
++            and (
++                self.previous_line.is_import
++                or self.previous_line.is_fmt_pass_converted(
++                    first_leaf_matches=is_import
++                )
++            )
+             and not current_line.is_import
++            and not (
++                # Should not add empty lines before a STANDALONE_COMMENT.
++                current_line.is_comment
++                and not current_line.is_fmt_pass_converted()
++            )
++            and not (
++                # Should not add empty lines between fmt pass lines.
++                current_line.is_fmt_pass_converted()
++                and self.previous_line.is_fmt_pass_converted()
++            )
              and not current_line.is_fmt_pass_converted(first_leaf_matches=is_import)
 -            and depth == self.previous_line.depth
 +            and len(depth) == len(self.previous_line.depth)
          ):
              return (before or 1), 0
  
-@@ -636,6 +671,14 @@ class EmptyLineTracker:
+@@ -636,6 +685,14 @@ class EmptyLineTracker:
          ):
              return before, 1
  
@@ -784,7 +799,7 @@
          if self.previous_line and self.previous_line.opens_block:
              return 0, 0
          return before, 0
-@@ -656,15 +699,16 @@ class EmptyLineTracker:
+@@ -656,15 +713,16 @@ class EmptyLineTracker:
  
              return 0, 0
  
@@ -804,7 +819,7 @@
              and before == 0
          ):
              slc = self.semantic_leading_comment
-@@ -681,9 +725,9 @@ class EmptyLineTracker:
+@@ -681,9 +739,9 @@ class EmptyLineTracker:
  
          if self.mode.is_pyi:
              if current_line.is_class or self.previous_line.is_class:
@@ -816,7 +831,7 @@
                      newlines = 1
                  elif current_line.is_stub_class and self.previous_line.is_stub_class:
                      # No blank line between classes with an empty body
-@@ -701,7 +745,7 @@ class EmptyLineTracker:
+@@ -701,7 +759,7 @@ class EmptyLineTracker:
                      # Blank line between a block of functions (maybe with preceding
                      # decorators) and a block of non-functions
                      newlines = 1
@@ -825,7 +840,7 @@
                  newlines = 1
              else:
                  newlines = 0
-@@ -761,10 +805,14 @@ def is_line_short_enough(  # noqa: C901
+@@ -761,10 +819,14 @@ def is_line_short_enough(  # noqa: C901
          line_str = line_to_string(line)
  
      width = str_width if mode.preview else len
@@ -841,7 +856,7 @@
              and "\n" not in line_str  # multiline strings
              and not line.contains_standalone_comments()
          )
-@@ -773,7 +821,7 @@ def is_line_short_enough(  # noqa: C901
+@@ -773,7 +835,7 @@ def is_line_short_enough(  # noqa: C901
          return False
      if "\n" not in line_str:
          # No multiline strings (MLS) present
@@ -850,7 +865,7 @@
  
      first, *_, last = line_str.split("\n")
      if width(first) > mode.line_length or width(last) > mode.line_length:
-@@ -963,7 +1011,7 @@ def can_omit_invisible_parens(
+@@ -963,7 +1025,7 @@ def can_omit_invisible_parens(
  def _can_omit_opening_paren(line: Line, *, first: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
      remainder = False
@@ -859,7 +874,7 @@
      _index = -1
      for _index, leaf, leaf_length in line.enumerate_with_length():
          if leaf.type in CLOSING_BRACKETS and leaf.opening_bracket is first:
-@@ -987,7 +1035,7 @@ def _can_omit_opening_paren(line: Line,
+@@ -987,7 +1049,7 @@ def _can_omit_opening_paren(line: Line,
  
  def _can_omit_closing_paren(line: Line, *, last: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""

@@ -656,9 +656,23 @@ class EmptyLineTracker:
 
         if (
             self.previous_line
-            and self.previous_line.is_import
-            # Should not add empty lines before a STANDALONE_COMMENT.
-            and not (current_line.is_import or current_line.is_comment)
+            and (
+                self.previous_line.is_import
+                or self.previous_line.is_fmt_pass_converted(
+                    first_leaf_matches=is_import
+                )
+            )
+            and not current_line.is_import
+            and not (
+                # Should not add empty lines before a STANDALONE_COMMENT.
+                current_line.is_comment
+                and not current_line.is_fmt_pass_converted()
+            )
+            and not (
+                # Should not add empty lines between fmt pass lines.
+                current_line.is_fmt_pass_converted()
+                and self.previous_line.is_fmt_pass_converted()
+            )
             and not current_line.is_fmt_pass_converted(first_leaf_matches=is_import)
             and len(depth) == len(self.previous_line.depth)
         ):
