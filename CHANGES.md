@@ -6,6 +6,12 @@ All notable changes to Pyink are recorded here.
 
 * Nothing notable unreleased.
 
+## 23.3.0
+
+This release is based on Black v23.3.0.
+
+* Pyink now requires Black v23.3.0 (for blib2to3).
+
 ## 23.1.1
 
 This release is based on https://github.com/psf/black/commit/9c8464ca7ddd48d1c19112d895ae12d783f01563.
