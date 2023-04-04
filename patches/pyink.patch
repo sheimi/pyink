@@ -516,16 +516,18 @@
              else:
                  docstring = leaf.value
              prefix = get_string_prefix(docstring)
-@@ -411,7 +442,7 @@ class LineGenerator(Visitor[Line]):
+@@ -411,8 +442,9 @@ class LineGenerator(Visitor[Line]):
              quote_len = 1 if docstring[1] != quote_char else 3
              docstring = docstring[quote_len:-quote_len]
              docstring_started_empty = not docstring
 -            indent = " " * 4 * self.current_line.depth
 +            indent = " " * self.current_line.indentation_spaces()
  
++            original_has_trailing_newline = docstring.endswith("\n")
              if is_multiline_string(leaf):
                  docstring = fix_docstring(docstring, indent)
-@@ -453,7 +484,11 @@ class LineGenerator(Visitor[Line]):
+             else:
+@@ -453,7 +485,13 @@ class LineGenerator(Visitor[Line]):
                  # If docstring is one line, we don't put the closing quotes on a
                  # separate line because it looks ugly (#3320).
                  lines = docstring.splitlines()
@@ -533,12 +535,30 @@
 +                last_line_length = (
 +                    # When docstring ends with '\n' the last line is empty,
 +                    # not the last item from splitlines().
-+                    len(lines[-1]) if docstring and not docstring.endswith("\n") else 0
++                    len(lines[-1])
++                    if docstring and not docstring.endswith("\n")
++                    else 0
 +                )
  
                  # If adding closing quotes would cause the last line to exceed
                  # the maximum line length then put a line break before the
-@@ -492,7 +527,8 @@ class LineGenerator(Visitor[Line]):
+@@ -465,6 +503,15 @@ class LineGenerator(Visitor[Line]):
+                     and not has_trailing_backslash
+                 ):
+                     leaf.value = prefix + quote + docstring + "\n" + indent + quote
++                elif (
++                    not indent
++                    and len(lines) > 1
++                    and not docstring.endswith("\n")
++                    and original_has_trailing_newline
++                ):
++                    # Special case for module docstrings that put trailing quotes on
++                    # their own line.
++                    leaf.value = prefix + quote + docstring + "\n" + indent + quote
+                 else:
+                     leaf.value = prefix + quote + docstring + quote
+             else:
+@@ -492,7 +539,8 @@ class LineGenerator(Visitor[Line]):
          self.visit_classdef = partial(v, keywords={"class"}, parens=Ø)
          self.visit_expr_stmt = partial(v, keywords=Ø, parens=ASSIGNMENTS)
          self.visit_return_stmt = partial(v, keywords={"return"}, parens={"return"})
@@ -548,7 +568,7 @@
          self.visit_del_stmt = partial(v, keywords=Ø, parens={"del"})
          self.visit_async_funcdef = self.visit_async_stmt
          self.visit_decorated = self.visit_decorators
-@@ -519,10 +555,11 @@ def transform_line(
+@@ -519,10 +567,11 @@ def transform_line(
  
      ll = mode.line_length
      sn = mode.string_normalization
@@ -564,7 +584,7 @@
  
      transformers: List[Transformer]
      if (
-@@ -697,8 +734,7 @@ def _first_right_hand_split(
+@@ -697,8 +746,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -574,7 +594,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -727,12 +763,53 @@ def _first_right_hand_split(
+@@ -727,12 +775,53 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -631,7 +651,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -891,7 +968,7 @@ def bracket_split_build_line(
+@@ -891,7 +980,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -640,7 +660,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1449,7 +1526,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1449,7 +1538,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -894,13 +914,20 @@
  from warnings import warn
  
  if sys.version_info < (3, 8):
-@@ -172,11 +172,26 @@ class Deprecated(UserWarning):
+@@ -172,11 +172,33 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
  
 +class Quote(Enum):
 +    SINGLE = "'"
 +    DOUBLE = '"'
++
++    def cache_key(self) -> str:
++        # On Windows, paths can't contain a double quote.
++        if self == Quote.SINGLE:
++            return "0"
++        else:
++            return "1"
 +
 +
 +class QuoteStyle(Enum):
@@ -921,7 +948,7 @@
      is_pyi: bool = False
      is_ipynb: bool = False
      skip_source_first_line: bool = False
-@@ -184,6 +199,8 @@ class Mode:
+@@ -184,6 +206,8 @@ class Mode:
      experimental_string_processing: bool = False
      python_cell_magics: Set[str] = field(default_factory=set)
      preview: bool = False
@@ -930,12 +957,12 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -218,12 +235,25 @@ class Mode:
+@@ -218,12 +242,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
 +            str(self.quote_style.value),
-+            self.majority_quote.value,
++            self.majority_quote.cache_key(),
              str(int(self.is_pyi)),
              str(int(self.is_ipynb)),
              str(int(self.skip_source_first_line)),
@@ -1178,10 +1205,15 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -2459,6 +2461,113 @@ class TestFileCollection:
+@@ -2459,6 +2461,119 @@ class TestFileCollection:
              stdin_filename=stdin_filename,
          )
  
++    def decode_and_normalized(self, stdout: bytes) -> str:
++        # Make it easier to test on Windows. The test doesn't care about
++        # newlines.
++        return stdout.decode().replace("\r\n", "\n")
++
 +    def test_pyink_default(self) -> None:
 +        path = THIS_DIR / "data" / "pyink_configs"
 +        example = str(path / "example.py")
@@ -1192,7 +1224,7 @@
 +        assert result.exit_code == 0
 +        assert result.stdout_bytes is not None
 +
-+        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
++        assert "- pass\n+    pass\n" in self.decode_and_normalized(result.stdout_bytes)
 +
 +    def test_pyink_overrides(self) -> None:
 +        path = THIS_DIR / "data" / "pyink_configs"
@@ -1204,7 +1236,7 @@
 +        assert result.exit_code == 0
 +        assert result.stdout_bytes is not None
 +
-+        assert "- pass\n+  pass\n" in result.stdout_bytes.decode()
++        assert "- pass\n+  pass\n" in self.decode_and_normalized(result.stdout_bytes)
 +
 +    def test_pyink_disable(self) -> None:
 +        path = THIS_DIR / "data" / "pyink_configs"
@@ -1216,7 +1248,7 @@
 +        assert result.exit_code == 0
 +        assert result.stdout_bytes is not None
 +
-+        stdout = result.stdout_bytes.decode()
++        stdout = self.decode_and_normalized(result.stdout_bytes)
 +        assert (
 +            """\
 +-from very.long.package.path.my_org.my_very_long_project_name.awesome_backend.core_framework.util import my_long_module_name
@@ -1238,7 +1270,7 @@
 +        assert result.exit_code == 0
 +        assert result.stdout_bytes is not None
 +
-+        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
++        assert "- pass\n+    pass\n" in self.decode_and_normalized(result.stdout_bytes)
 +
 +    @pytest.mark.parametrize("values", [("7-7",), ("1-1", "7-7")])
 +    def test_pyink_lines(self, values) -> None:
@@ -1254,8 +1286,9 @@
 +        assert result.exit_code == 0
 +        assert result.stdout_bytes is not None
 +
-+        assert "-from" not in result.stderr_bytes.decode()
-+        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
++        stdout = self.decode_and_normalized(result.stdout_bytes)
++        assert "-from" not in stdout
++        assert "- pass\n+    pass\n" in stdout
 +
 +    @pytest.mark.parametrize(
 +        "value,message",
@@ -1287,7 +1320,7 @@
 +        assert result.stdout_bytes is not None
 +
 +        diff = """-_double = "Double"\n+_double = 'Double'\n"""
-+        assert diff in result.stdout_bytes.decode()
++        assert diff in self.decode_and_normalized(result.stdout_bytes)
 +
  
  try:

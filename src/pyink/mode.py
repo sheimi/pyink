@@ -176,6 +176,13 @@ class Quote(Enum):
     SINGLE = "'"
     DOUBLE = '"'
 
+    def cache_key(self) -> str:
+        # On Windows, paths can't contain a double quote.
+        if self == Quote.SINGLE:
+            return "0"
+        else:
+            return "1"
+
 
 class QuoteStyle(Enum):
     SINGLE = auto()
@@ -236,7 +243,7 @@ class Mode:
             str(self.line_length),
             str(int(self.string_normalization)),
             str(self.quote_style.value),
-            self.majority_quote.value,
+            self.majority_quote.cache_key(),
             str(int(self.is_pyi)),
             str(int(self.is_ipynb)),
             str(int(self.skip_source_first_line)),

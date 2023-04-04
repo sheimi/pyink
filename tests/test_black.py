@@ -2461,6 +2461,11 @@ class TestFileCollection:
             stdin_filename=stdin_filename,
         )
 
+    def decode_and_normalized(self, stdout: bytes) -> str:
+        # Make it easier to test on Windows. The test doesn't care about
+        # newlines.
+        return stdout.decode().replace("\r\n", "\n")
+
     def test_pyink_default(self) -> None:
         path = THIS_DIR / "data" / "pyink_configs"
         example = str(path / "example.py")
@@ -2471,7 +2476,7 @@ class TestFileCollection:
         assert result.exit_code == 0
         assert result.stdout_bytes is not None
 
-        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
+        assert "- pass\n+    pass\n" in self.decode_and_normalized(result.stdout_bytes)
 
     def test_pyink_overrides(self) -> None:
         path = THIS_DIR / "data" / "pyink_configs"
@@ -2483,7 +2488,7 @@ class TestFileCollection:
         assert result.exit_code == 0
         assert result.stdout_bytes is not None
 
-        assert "- pass\n+  pass\n" in result.stdout_bytes.decode()
+        assert "- pass\n+  pass\n" in self.decode_and_normalized(result.stdout_bytes)
 
     def test_pyink_disable(self) -> None:
         path = THIS_DIR / "data" / "pyink_configs"
@@ -2495,7 +2500,7 @@ class TestFileCollection:
         assert result.exit_code == 0
         assert result.stdout_bytes is not None
 
-        stdout = result.stdout_bytes.decode()
+        stdout = self.decode_and_normalized(result.stdout_bytes)
         assert (
             """\
 -from very.long.package.path.my_org.my_very_long_project_name.awesome_backend.core_framework.util import my_long_module_name
@@ -2517,7 +2522,7 @@ class TestFileCollection:
         assert result.exit_code == 0
         assert result.stdout_bytes is not None
 
-        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
+        assert "- pass\n+    pass\n" in self.decode_and_normalized(result.stdout_bytes)
 
     @pytest.mark.parametrize("values", [("7-7",), ("1-1", "7-7")])
     def test_pyink_lines(self, values) -> None:
@@ -2533,8 +2538,9 @@ class TestFileCollection:
         assert result.exit_code == 0
         assert result.stdout_bytes is not None
 
-        assert "-from" not in result.stderr_bytes.decode()
-        assert "- pass\n+    pass\n" in result.stdout_bytes.decode()
+        stdout = self.decode_and_normalized(result.stdout_bytes)
+        assert "-from" not in stdout
+        assert "- pass\n+    pass\n" in stdout
 
     @pytest.mark.parametrize(
         "value,message",
@@ -2566,7 +2572,7 @@ class TestFileCollection:
         assert result.stdout_bytes is not None
 
         diff = """-_double = "Double"\n+_double = 'Double'\n"""
-        assert diff in result.stdout_bytes.decode()
+        assert diff in self.decode_and_normalized(result.stdout_bytes)
 
 
 try:
