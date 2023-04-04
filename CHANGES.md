@@ -6,6 +6,11 @@ All notable changes to Pyink are recorded here.
 
 * Nothing notable unreleased.
 
+## 23.3.1
+
+* In multiline module docstrings, trailing quotes that are put on their own line
+  are now kept on their own line. (#8)
+
 ## 23.3.0
 
 This release is based on Black v23.3.0.

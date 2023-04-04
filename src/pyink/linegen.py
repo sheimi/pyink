@@ -442,6 +442,7 @@ class LineGenerator(Visitor[Line]):
             docstring_started_empty = not docstring
             indent = " " * self.current_line.indentation_spaces()
 
+            original_has_trailing_newline = docstring.endswith("\n")
             if is_multiline_string(leaf):
                 docstring = fix_docstring(docstring, indent)
             else:
@@ -478,7 +479,9 @@ class LineGenerator(Visitor[Line]):
                 last_line_length = (
                     # When docstring ends with '\n' the last line is empty,
                     # not the last item from splitlines().
-                    len(lines[-1]) if docstring and not docstring.endswith("\n") else 0
+                    len(lines[-1])
+                    if docstring and not docstring.endswith("\n")
+                    else 0
                 )
 
                 # If adding closing quotes would cause the last line to exceed
@@ -490,6 +493,15 @@ class LineGenerator(Visitor[Line]):
                     and len(indent) + quote_len <= self.mode.line_length
                     and not has_trailing_backslash
                 ):
+                    leaf.value = prefix + quote + docstring + "\n" + indent + quote
+                elif (
+                    not indent
+                    and len(lines) > 1
+                    and not docstring.endswith("\n")
+                    and original_has_trailing_newline
+                ):
+                    # Special case for module docstrings that put trailing quotes on
+                    # their own line.
                     leaf.value = prefix + quote + docstring + "\n" + indent + quote
                 else:
                     leaf.value = prefix + quote + docstring + quote
