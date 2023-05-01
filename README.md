@@ -103,6 +103,57 @@ patches as possible in the future.
 *   Module docstrings are formatted same as other docstrings (see
     [psf/black#3493](https://github.com/psf/black/issues/3493)).
 
+*   Existing parentheses around strings are kept if the content does not fit on
+    a single line. This is related to https://github.com/psf/black/pull/3640
+    where we still want to keep the parentheses around the implicitly
+    concatenated strings if the code already uses them, making it more obvious
+    it's a single function argument. Example:
+
+    ```python
+    # Original code:
+    func1(
+        (
+            " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+            " incididunt ut labore et dolore magna aliqua Ut enim ad minim"
+        ),
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+
+    func2(
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+
+    # Pyink:
+    func1(
+        (
+            " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+            " incididunt ut labore et dolore magna aliqua Ut enim ad minim"
+        ),
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+
+    func2(
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+
+    # Black:
+    func1(
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+
+    func2(
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor"
+        " incididunt ut labore et dolore magna aliqua Ut enim ad minim",
+        " lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor",
+    )
+    ```
+
 *   Temporarily disabled the following _Black_ future style changes:
 
     *   https://github.com/psf/black/pull/2916

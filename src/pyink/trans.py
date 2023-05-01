@@ -197,11 +197,17 @@ class StringTransformer(ABC):
     # Ideally this would be a dataclass, but unfortunately mypyc breaks when used with
     # `abc.ABC`.
     def __init__(
-        self, line_length: int, normalize_strings: bool, *, preferred_quote: Quote
+        self,
+        line_length: int,
+        normalize_strings: bool,
+        *,
+        preferred_quote: Quote,
+        line_str: str,
     ) -> None:
         self.line_length = line_length
         self.normalize_strings = normalize_strings
         self.preferred_quote = preferred_quote
+        self.line_str = line_str
 
     @abstractmethod
     def do_match(self, line: Line) -> TMatchResult:
@@ -899,7 +905,13 @@ class StringParenStripper(StringTransformer):
                     idx += 1
 
         if string_indices:
-            return Ok(string_indices)
+            if (
+                not line.mode.is_pyink
+                or len(self.line_str) - len(string_indices) * 2 <= self.line_length
+            ):
+                return Ok(string_indices)
+            else:
+                return TErr("With parens stripped, the line is still too long.")
         return TErr("This line has no strings wrapped in parens.")
 
     def do_transform(

@@ -559,10 +559,18 @@ def transform_line(
     ll = mode.line_length
     sn = mode.string_normalization
     preferred_quote = mode.preferred_quote
-    string_merge = StringMerger(ll, sn, preferred_quote=preferred_quote)
-    string_paren_strip = StringParenStripper(ll, sn, preferred_quote=preferred_quote)
-    string_split = StringSplitter(ll, sn, preferred_quote=preferred_quote)
-    string_paren_wrap = StringParenWrapper(ll, sn, preferred_quote=preferred_quote)
+    string_merge = StringMerger(
+        ll, sn, preferred_quote=preferred_quote, line_str=line_str
+    )
+    string_paren_strip = StringParenStripper(
+        ll, sn, preferred_quote=preferred_quote, line_str=line_str
+    )
+    string_split = StringSplitter(
+        ll, sn, preferred_quote=preferred_quote, line_str=line_str
+    )
+    string_paren_wrap = StringParenWrapper(
+        ll, sn, preferred_quote=preferred_quote, line_str=line_str
+    )
 
     transformers: List[Transformer]
     if (

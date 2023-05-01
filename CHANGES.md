@@ -4,7 +4,11 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-* Nothing notable unreleased.
+* Existing parentheses around strings are no longer removed if the content does
+  not fit on a single line. This is related to
+  https://github.com/psf/black/pull/3640 where we still want to keep the
+  parentheses around the implicitly concatenated strings if the code already
+  uses them, making it more obvious it's a single function argument.
 
 ## 23.3.1
 
