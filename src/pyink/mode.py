@@ -9,13 +9,13 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from hashlib import sha256
 from operator import attrgetter
-from typing import Dict, Set
+from typing import Dict, Literal, Set
 from warnings import warn
 
 if sys.version_info < (3, 8):
-    from typing_extensions import Final, Literal
+    from typing_extensions import Final
 else:
-    from typing import Final, Literal
+    from typing import Final
 
 from pyink.const import DEFAULT_LINE_LENGTH
 
