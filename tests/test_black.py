@@ -1385,6 +1385,28 @@ class BlackTestCase(BlackBaseTestCase):
                 pass  # StringIO does not support detach
             assert output.getvalue() == ""
 
+    def test_format_stdin_to_stdout_with_lines(self) -> None:
+        contents = """\
+def func1(): pass
+def func2(): pass
+"""
+        formatted = """\
+def func1():
+    pass
+
+
+def func2(): pass
+"""
+        runner = BlackRunner()
+        result = runner.invoke(
+            pyink.main,
+            ["-", "--fast", "--pyink-lines=1-1"],
+            input=BytesIO(contents.encode("utf8")),
+        )
+        self.assertEqual(result.exit_code, 0)
+        output = result.stdout_bytes.decode("utf8")
+        assert output == formatted
+
     def test_invalid_cli_regex(self) -> None:
         for option in ["--include", "--exclude", "--extend-exclude", "--force-exclude"]:
             self.invokeBlack(["-", option, "**()(!!*)"], exit_code=2)
