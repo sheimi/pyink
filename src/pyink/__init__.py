@@ -963,7 +963,7 @@ def format_stdin_to_stdout(
 
     dst = src
     try:
-        dst = format_file_contents(src, fast=fast, mode=mode)
+        dst = format_file_contents(src, fast=fast, mode=mode, lines=lines)
         return True
 
     except NothingChanged:
