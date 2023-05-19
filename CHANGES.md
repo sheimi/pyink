@@ -4,12 +4,17 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
+* Nothing notable unreleased.
+
+## 23.5.0
+
 * Existing parentheses around strings are no longer removed if the content does
   not fit on a single line. This is related to
   https://github.com/psf/black/pull/3640 where we still want to keep the
   parentheses around the implicitly concatenated strings if the code already
   uses them, making it more obvious it's a single function argument.
 * `--pyink-lines=` now works with stdin inputs (#16).
+* Fixed compatibility issue on Python 3.7 (#13).
 
 ## 23.3.1
 
