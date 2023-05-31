@@ -1176,7 +1176,7 @@ def format_str(
     ) -> None:
         hey
 
-    `lines` is either None or a list of tuples of intergers. Each tuple
+    `lines` is either None or a list of tuples of integers. Each tuple
     [start, end] in the list corresponds to a line range to format. They are
     1-based and inclusive on both ends. When not None, the formatting will be
     restricted to those lines whenever possible.

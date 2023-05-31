@@ -27,7 +27,7 @@
  from pyink.report import Changed, NothingChanged, Report
  from pyink.trans import iter_fexpr_spans
  from blib2to3.pgen2 import token
-@@ -283,6 +287,41 @@ def validate_regex(
+@@ -284,6 +288,41 @@ def validate_regex(
      ),
  )
  @click.option(
@@ -69,7 +69,7 @@
      "--check",
      is_flag=True,
      help=(
-@@ -441,6 +480,10 @@ def main(  # noqa: C901
+@@ -442,6 +481,10 @@ def main(  # noqa: C901
      skip_magic_trailing_comma: bool,
      experimental_string_processing: bool,
      preview: bool,
@@ -80,7 +80,7 @@
      quiet: bool,
      verbose: bool,
      required_version: Optional[str],
-@@ -541,6 +584,7 @@ def main(  # noqa: C901
+@@ -540,6 +583,7 @@ def main(  # noqa: C901
      else:
          # We'll autodetect later.
          versions = set()
@@ -88,7 +88,7 @@
      mode = Mode(
          target_versions=versions,
          line_length=line_length,
-@@ -552,8 +596,36 @@ def main(  # noqa: C901
+@@ -551,8 +595,36 @@ def main(  # noqa: C901
          experimental_string_processing=experimental_string_processing,
          preview=preview,
          python_cell_magics=set(python_cell_magics),
@@ -125,7 +125,7 @@
      if code is not None:
          # Run in quiet mode by default with -c; the extra output isn't useful.
          # You can still pass -v to get verbose output.
-@@ -597,6 +669,7 @@ def main(  # noqa: C901
+@@ -596,6 +668,7 @@ def main(  # noqa: C901
                  write_back=write_back,
                  mode=mode,
                  report=report,
@@ -133,7 +133,7 @@
              )
          else:
              from pyink.concurrency import reformat_many
-@@ -741,7 +814,13 @@ def reformat_code(
+@@ -740,7 +813,13 @@ def reformat_code(
  # not ideal, but this shouldn't cause any issues ... hopefully. ~ichard26
  @mypyc_attr(patchable=True)
  def reformat_one(
@@ -148,7 +148,7 @@
  ) -> None:
      """Reformat a single file under `src` without spawning child processes.
  
-@@ -766,7 +845,9 @@ def reformat_one(
+@@ -765,7 +844,9 @@ def reformat_one(
                  mode = replace(mode, is_pyi=True)
              elif src.suffix == ".ipynb":
                  mode = replace(mode, is_ipynb=True)
@@ -159,7 +159,7 @@
                  changed = Changed.YES
          else:
              cache: Cache = {}
-@@ -777,7 +858,7 @@ def reformat_one(
+@@ -776,7 +857,7 @@ def reformat_one(
                  if res_src_s in cache and cache[res_src_s] == get_cache_info(res_src):
                      changed = Changed.CACHED
              if changed is not Changed.CACHED and format_file_in_place(
@@ -168,7 +168,7 @@
              ):
                  changed = Changed.YES
              if (write_back is WriteBack.YES and changed is not Changed.CACHED) or (
-@@ -797,6 +878,8 @@ def format_file_in_place(
+@@ -796,6 +877,8 @@ def format_file_in_place(
      mode: Mode,
      write_back: WriteBack = WriteBack.NO,
      lock: Any = None,  # multiprocessing.Manager().Lock() is some crazy proxy
@@ -177,7 +177,7 @@
  ) -> bool:
      """Format file under `src` path. Return True if changed.
  
-@@ -816,7 +899,9 @@ def format_file_in_place(
+@@ -815,7 +898,9 @@ def format_file_in_place(
              header = buf.readline()
          src_contents, encoding, newline = decode_bytes(buf.read())
      try:
@@ -188,7 +188,7 @@
      except NothingChanged:
          return False
      except JSONDecodeError:
-@@ -861,6 +946,7 @@ def format_stdin_to_stdout(
+@@ -860,6 +945,7 @@ def format_stdin_to_stdout(
      content: Optional[str] = None,
      write_back: WriteBack = WriteBack.NO,
      mode: Mode,
@@ -196,7 +196,16 @@
  ) -> bool:
      """Format file on stdin. Return True if changed.
  
-@@ -907,7 +993,11 @@ def format_stdin_to_stdout(
+@@ -878,7 +964,7 @@ def format_stdin_to_stdout(
+ 
+     dst = src
+     try:
+-        dst = format_file_contents(src, fast=fast, mode=mode)
++        dst = format_file_contents(src, fast=fast, mode=mode, lines=lines)
+         return True
+ 
+     except NothingChanged:
+@@ -906,7 +992,11 @@ def format_stdin_to_stdout(
  
  
  def check_stability_and_equivalence(
@@ -209,7 +218,7 @@
  ) -> None:
      """Perform stability and equivalence checks.
  
-@@ -916,10 +1006,16 @@ def check_stability_and_equivalence(
+@@ -915,10 +1005,16 @@ def check_stability_and_equivalence(
      content differently.
      """
      assert_equivalent(src_contents, dst_contents)
@@ -228,7 +237,7 @@
      """Reformat contents of a file and return new contents.
  
      If `fast` is False, additionally confirm that the reformatted code is
-@@ -929,13 +1025,15 @@ def format_file_contents(src_contents: s
+@@ -928,13 +1024,15 @@ def format_file_contents(src_contents: s
      if mode.is_ipynb:
          dst_contents = format_ipynb_string(src_contents, fast=fast, mode=mode)
      else:
@@ -246,7 +255,7 @@
      return dst_contents
  
  
-@@ -1046,7 +1144,12 @@ def format_ipynb_string(src_contents: st
+@@ -1045,7 +1143,12 @@ def format_ipynb_string(src_contents: st
          raise NothingChanged
  
  
@@ -260,11 +269,11 @@
      """Reformat a string and return new contents.
  
      `mode` determines formatting options, such as how many characters per line are
-@@ -1075,17 +1178,28 @@ def format_str(src_contents: str, *, mod
+@@ -1074,17 +1177,28 @@ def format_str(src_contents: str, *, mod
      ) -> None:
          hey
  
-+    `lines` is either None or a list of tuples of intergers. Each tuple
++    `lines` is either None or a list of tuples of integers. Each tuple
 +    [start, end] in the list corresponds to a line range to format. They are
 +    1-based and inclusive on both ends. When not None, the formatting will be
 +    restricted to those lines whenever possible.
@@ -292,7 +301,7 @@
      src_node = lib2to3_parse(src_contents.lstrip(), mode.target_versions)
      dst_blocks: List[LinesBlock] = []
      if mode.target_versions:
-@@ -1094,13 +1208,20 @@ def _format_str_once(src_contents: str,
+@@ -1093,6 +1207,8 @@ def _format_str_once(src_contents: str,
          future_imports = get_future_imports(src_node)
          versions = detect_target_versions(src_node, future_imports=future_imports)
  
@@ -301,9 +310,10 @@
      context_manager_features = {
          feature
          for feature in {Feature.PARENTHESIZED_CONTEXT_MANAGERS}
-         if supports_feature(versions, feature)
-     }
+@@ -1101,7 +1217,12 @@ def _format_str_once(src_contents: str,
      normalize_fmt_off(src_node)
+     # This should be called after normalize_fmt_off but before convert_unchanged_lines.
+     import_sorting.sort_imports_in_place(src_node, reformat=True, safe_mode=True, lines=lines)
 -    lines = LineGenerator(mode=mode, features=context_manager_features)
 +
 +    if lines:
@@ -314,7 +324,7 @@
      elt = EmptyLineTracker(mode=mode)
      split_line_features = {
          feature
-@@ -1108,7 +1229,7 @@ def _format_str_once(src_contents: str,
+@@ -1109,7 +1230,7 @@ def _format_str_once(src_contents: str,
          if supports_feature(versions, feature)
      }
      block: Optional[LinesBlock] = None
@@ -323,7 +333,7 @@
          block = elt.maybe_empty_lines(current_line)
          dst_blocks.append(block)
          for line in transform_line(
-@@ -1373,12 +1494,20 @@ def assert_equivalent(src: str, dst: str
+@@ -1374,12 +1495,20 @@ def assert_equivalent(src: str, dst: str
          ) from None
  
  
@@ -365,16 +375,19 @@
 +)
 --- a/linegen.py
 +++ b/linegen.py
-@@ -5,7 +5,7 @@ import sys
- from dataclasses import replace
- from enum import Enum, auto
+@@ -7,6 +7,11 @@ from enum import Enum, auto
  from functools import partial, wraps
--from typing import Collection, Iterator, List, Optional, Set, Union, cast
-+from typing import Collection, Iterator, List, Literal, Optional, Set, Union, cast
+ from typing import Collection, Iterator, List, Optional, Set, Union, cast
  
++if sys.version_info < (3, 8):
++    from typing_extensions import Final, Literal
++else:
++    from typing import Final, Literal
++
  from pyink.brackets import (
      COMMA_PRIORITY,
-@@ -15,6 +15,7 @@ from pyink.brackets import (
+     DOT_PRIORITY,
+@@ -15,6 +20,7 @@ from pyink.brackets import (
  )
  from pyink.comments import FMT_OFF, generate_comments, list_comments
  from pyink.lines import (
@@ -382,7 +395,7 @@
      Line,
      RHSResult,
      append_leaves,
-@@ -82,6 +83,15 @@ LeafID = int
+@@ -82,6 +88,15 @@ LeafID = int
  LN = Union[Leaf, Node]
  
  
@@ -398,7 +411,7 @@
  class CannotSplit(CannotTransform):
      """A readable split that fits the allotted line length is impossible."""
  
-@@ -101,7 +111,9 @@ class LineGenerator(Visitor[Line]):
+@@ -101,7 +116,9 @@ class LineGenerator(Visitor[Line]):
          self.current_line: Line
          self.__post_init__()
  
@@ -409,7 +422,7 @@
          """Generate a line.
  
          If the line is empty, only emit if it makes sense.
-@@ -110,7 +122,10 @@ class LineGenerator(Visitor[Line]):
+@@ -110,7 +127,10 @@ class LineGenerator(Visitor[Line]):
          If any lines were generated, set up a new current_line.
          """
          if not self.current_line:
@@ -421,7 +434,7 @@
              return  # Line is empty, don't emit. Creating a new one unnecessary.
  
          if (
-@@ -125,7 +140,13 @@ class LineGenerator(Visitor[Line]):
+@@ -125,7 +145,13 @@ class LineGenerator(Visitor[Line]):
              return
  
          complete_line = self.current_line
@@ -436,7 +449,7 @@
          yield complete_line
  
      def visit_default(self, node: LN) -> Iterator[Line]:
-@@ -151,7 +172,9 @@ class LineGenerator(Visitor[Line]):
+@@ -151,7 +177,9 @@ class LineGenerator(Visitor[Line]):
              normalize_prefix(node, inside_brackets=any_open_brackets)
              if self.mode.string_normalization and node.type == token.STRING:
                  node.value = normalize_string_prefix(node.value)
@@ -447,7 +460,7 @@
              if node.type == token.NUMBER:
                  normalize_numeric_literal(node)
              if node.type not in WHITESPACE:
-@@ -161,7 +184,10 @@ class LineGenerator(Visitor[Line]):
+@@ -161,7 +189,10 @@ class LineGenerator(Visitor[Line]):
      def visit_test(self, node: Node) -> Iterator[Line]:
          """Visit an `x if y else z` test"""
  
@@ -459,7 +472,7 @@
              already_parenthesized = (
                  node.prev_sibling and node.prev_sibling.type == token.LPAR
              )
-@@ -177,7 +203,7 @@ class LineGenerator(Visitor[Line]):
+@@ -177,7 +208,7 @@ class LineGenerator(Visitor[Line]):
      def visit_INDENT(self, node: Leaf) -> Iterator[Line]:
          """Increase indentation level, maybe yield a line."""
          # In blib2to3 INDENT never holds comments.
@@ -468,7 +481,7 @@
          yield from self.visit_default(node)
  
      def visit_DEDENT(self, node: Leaf) -> Iterator[Line]:
-@@ -192,7 +218,7 @@ class LineGenerator(Visitor[Line]):
+@@ -192,7 +223,7 @@ class LineGenerator(Visitor[Line]):
          yield from self.visit_default(node)
  
          # Finally, emit the dedent.
@@ -477,7 +490,7 @@
  
      def visit_stmt(
          self, node: Node, keywords: Set[str], parens: Set[str]
-@@ -288,9 +314,9 @@ class LineGenerator(Visitor[Line]):
+@@ -288,9 +319,9 @@ class LineGenerator(Visitor[Line]):
              if self.mode.is_pyi and is_stub_body(node):
                  yield from self.visit_default(node)
              else:
@@ -489,7 +502,7 @@
  
          else:
              if (
-@@ -383,10 +409,13 @@ class LineGenerator(Visitor[Line]):
+@@ -383,10 +414,13 @@ class LineGenerator(Visitor[Line]):
          yield from self.visit_default(node)
  
      def visit_STRING(self, leaf: Leaf) -> Iterator[Line]:
@@ -505,7 +518,7 @@
              # We're ignoring docstrings with backslash newline escapes because changing
              # indentation of those changes the AST representation of the code.
              if self.mode.string_normalization:
-@@ -397,7 +426,9 @@ class LineGenerator(Visitor[Line]):
+@@ -397,7 +431,9 @@ class LineGenerator(Visitor[Line]):
                  # formatting as visit_default() is called *after*. To avoid a
                  # situation where this function formats a docstring differently on
                  # the second pass, normalize it early.
@@ -516,7 +529,7 @@
              else:
                  docstring = leaf.value
              prefix = get_string_prefix(docstring)
-@@ -411,8 +442,9 @@ class LineGenerator(Visitor[Line]):
+@@ -411,8 +447,9 @@ class LineGenerator(Visitor[Line]):
              quote_len = 1 if docstring[1] != quote_char else 3
              docstring = docstring[quote_len:-quote_len]
              docstring_started_empty = not docstring
@@ -527,7 +540,7 @@
              if is_multiline_string(leaf):
                  docstring = fix_docstring(docstring, indent)
              else:
-@@ -453,7 +485,13 @@ class LineGenerator(Visitor[Line]):
+@@ -453,7 +490,13 @@ class LineGenerator(Visitor[Line]):
                  # If docstring is one line, we don't put the closing quotes on a
                  # separate line because it looks ugly (#3320).
                  lines = docstring.splitlines()
@@ -542,7 +555,7 @@
  
                  # If adding closing quotes would cause the last line to exceed
                  # the maximum line length then put a line break before the
-@@ -465,6 +503,15 @@ class LineGenerator(Visitor[Line]):
+@@ -465,6 +508,15 @@ class LineGenerator(Visitor[Line]):
                      and not has_trailing_backslash
                  ):
                      leaf.value = prefix + quote + docstring + "\n" + indent + quote
@@ -558,7 +571,7 @@
                  else:
                      leaf.value = prefix + quote + docstring + quote
              else:
-@@ -492,7 +539,8 @@ class LineGenerator(Visitor[Line]):
+@@ -492,7 +544,8 @@ class LineGenerator(Visitor[Line]):
          self.visit_classdef = partial(v, keywords={"class"}, parens=Ø)
          self.visit_expr_stmt = partial(v, keywords=Ø, parens=ASSIGNMENTS)
          self.visit_return_stmt = partial(v, keywords={"return"}, parens={"return"})
@@ -568,7 +581,7 @@
          self.visit_del_stmt = partial(v, keywords=Ø, parens={"del"})
          self.visit_async_funcdef = self.visit_async_stmt
          self.visit_decorated = self.visit_decorators
-@@ -519,10 +567,11 @@ def transform_line(
+@@ -519,10 +572,19 @@ def transform_line(
  
      ll = mode.line_length
      sn = mode.string_normalization
@@ -577,14 +590,22 @@
 -    string_split = StringSplitter(ll, sn)
 -    string_paren_wrap = StringParenWrapper(ll, sn)
 +    preferred_quote = mode.preferred_quote
-+    string_merge = StringMerger(ll, sn, preferred_quote=preferred_quote)
-+    string_paren_strip = StringParenStripper(ll, sn, preferred_quote=preferred_quote)
-+    string_split = StringSplitter(ll, sn, preferred_quote=preferred_quote)
-+    string_paren_wrap = StringParenWrapper(ll, sn, preferred_quote=preferred_quote)
++    string_merge = StringMerger(
++        ll, sn, preferred_quote=preferred_quote, line_str=line_str
++    )
++    string_paren_strip = StringParenStripper(
++        ll, sn, preferred_quote=preferred_quote, line_str=line_str
++    )
++    string_split = StringSplitter(
++        ll, sn, preferred_quote=preferred_quote, line_str=line_str
++    )
++    string_paren_wrap = StringParenWrapper(
++        ll, sn, preferred_quote=preferred_quote, line_str=line_str
++    )
  
      transformers: List[Transformer]
      if (
-@@ -697,8 +746,7 @@ def _first_right_hand_split(
+@@ -697,8 +759,7 @@ def _first_right_hand_split(
      omit: Collection[LeafID] = (),
  ) -> RHSResult:
      """Split the line into head, body, tail starting with the last bracket pair.
@@ -594,7 +615,7 @@
      _maybe_split_omitting_optional_parens to get an opinion whether to prefer
      splitting on the right side of an assignment statement.
      """
-@@ -727,12 +775,53 @@ def _first_right_hand_split(
+@@ -727,12 +788,53 @@ def _first_right_hand_split(
      tail_leaves.reverse()
      body_leaves.reverse()
      head_leaves.reverse()
@@ -651,7 +672,7 @@
      tail = bracket_split_build_line(
          tail_leaves, line, opening_bracket, component=_BracketSplitComponent.tail
      )
-@@ -891,7 +980,7 @@ def bracket_split_build_line(
+@@ -891,7 +993,7 @@ def bracket_split_build_line(
      result = Line(mode=original.mode, depth=original.depth)
      if component is _BracketSplitComponent.body:
          result.inside_brackets = True
@@ -660,7 +681,7 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1449,7 +1538,7 @@ def generate_trailers_to_omit(line: Line
+@@ -1449,7 +1551,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
@@ -905,15 +926,18 @@
          length += leaf_length
 --- a/mode.py
 +++ b/mode.py
-@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
- from enum import Enum, auto
- from hashlib import sha256
- from operator import attrgetter
--from typing import Dict, Set
-+from typing import Dict, Literal, Set
+@@ -13,9 +13,9 @@ from typing import Dict, Set
  from warnings import warn
  
  if sys.version_info < (3, 8):
+-    from typing_extensions import Final
++    from typing_extensions import Final, Literal
+ else:
+-    from typing import Final
++    from typing import Final, Literal
+ 
+ from pyink.const import DEFAULT_LINE_LENGTH
+ 
 @@ -172,11 +172,33 @@ class Deprecated(UserWarning):
      """Visible deprecation warning."""
  
@@ -957,7 +981,7 @@
  
      def __post_init__(self) -> None:
          if self.experimental_string_processing:
-@@ -218,12 +242,25 @@ class Mode:
+@@ -216,12 +240,25 @@ class Mode:
              version_str,
              str(self.line_length),
              str(int(self.string_normalization)),
@@ -1180,7 +1204,7 @@
 +pyink = false
 --- a/tests/test_black.py
 +++ b/tests/test_black.py
-@@ -1288,7 +1288,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1246,7 +1246,7 @@ class BlackTestCase(BlackBaseTestCase):
                  report=report,
              )
              fsts.assert_called_once_with(
@@ -1189,7 +1213,7 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -1314,6 +1314,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1272,6 +1272,7 @@ class BlackTestCase(BlackBaseTestCase):
                  fast=True,
                  write_back=pyink.WriteBack.YES,
                  mode=replace(DEFAULT_MODE, is_pyi=True),
@@ -1197,7 +1221,7 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -1339,6 +1340,7 @@ class BlackTestCase(BlackBaseTestCase):
+@@ -1297,6 +1298,7 @@ class BlackTestCase(BlackBaseTestCase):
                  fast=True,
                  write_back=pyink.WriteBack.YES,
                  mode=replace(DEFAULT_MODE, is_ipynb=True),
@@ -1205,7 +1229,36 @@
              )
              # __PYINK_STDIN_FILENAME__ should have been stripped
              report.done.assert_called_with(expected, pyink.Changed.YES)
-@@ -2459,6 +2461,119 @@ class TestFileCollection:
+@@ -1383,6 +1385,28 @@ class BlackTestCase(BlackBaseTestCase):
+                 pass  # StringIO does not support detach
+             assert output.getvalue() == ""
+ 
++    def test_format_stdin_to_stdout_with_lines(self) -> None:
++        contents = """\
++def func1(): pass
++def func2(): pass
++"""
++        formatted = """\
++def func1():
++    pass
++
++
++def func2(): pass
++"""
++        runner = BlackRunner()
++        result = runner.invoke(
++            pyink.main,
++            ["-", "--fast", "--pyink-lines=1-1"],
++            input=BytesIO(contents.encode("utf8")),
++        )
++        self.assertEqual(result.exit_code, 0)
++        output = result.stdout_bytes.decode("utf8")
++        assert output == formatted
++
+     def test_invalid_cli_regex(self) -> None:
+         for option in ["--include", "--exclude", "--extend-exclude", "--force-exclude"]:
+             self.invokeBlack(["-", option, "**()(!!*)"], exit_code=2)
+@@ -2417,6 +2441,119 @@ class TestFileCollection:
              stdin_filename=stdin_filename,
          )
  
@@ -1364,21 +1417,27 @@
  from pyink.nodes import (
      CLOSING_BRACKETS,
      OPENING_BRACKETS,
-@@ -196,9 +196,12 @@ class StringTransformer(ABC):
+@@ -196,9 +196,18 @@ class StringTransformer(ABC):
  
      # Ideally this would be a dataclass, but unfortunately mypyc breaks when used with
      # `abc.ABC`.
 -    def __init__(self, line_length: int, normalize_strings: bool) -> None:
 +    def __init__(
-+        self, line_length: int, normalize_strings: bool, *, preferred_quote: Quote
++        self,
++        line_length: int,
++        normalize_strings: bool,
++        *,
++        preferred_quote: Quote,
++        line_str: str,
 +    ) -> None:
          self.line_length = line_length
          self.normalize_strings = normalize_strings
 +        self.preferred_quote = preferred_quote
++        self.line_str = line_str
  
      @abstractmethod
      def do_match(self, line: Line) -> TMatchResult:
-@@ -653,7 +656,9 @@ class StringMerger(StringTransformer, Cu
+@@ -653,7 +662,9 @@ class StringMerger(StringTransformer, Cu
  
          S_leaf = Leaf(token.STRING, S)
          if self.normalize_strings:
@@ -1389,7 +1448,22 @@
  
          # Fill the 'custom_splits' list with the appropriate CustomSplit objects.
          temp_string = S_leaf.value[len(prefix) + 1 : -1]
-@@ -1092,7 +1097,7 @@ class BaseStringSplitter(StringTransform
+@@ -894,7 +905,13 @@ class StringParenStripper(StringTransfor
+                     idx += 1
+ 
+         if string_indices:
+-            return Ok(string_indices)
++            if (
++                not line.mode.is_pyink
++                or len(self.line_str) - len(string_indices) * 2 <= self.line_length
++            ):
++                return Ok(string_indices)
++            else:
++                return TErr("With parens stripped, the line is still too long.")
+         return TErr("This line has no strings wrapped in parens.")
+ 
+     def do_transform(
+@@ -1092,7 +1109,7 @@ class BaseStringSplitter(StringTransform
          #   NN: The leaf that is after N.
  
          # WMA4 the whitespace at the beginning of the line.
@@ -1398,7 +1472,7 @@
  
          if is_valid_index(string_idx - 1):
              p_idx = string_idx - 1
-@@ -1432,7 +1437,7 @@ class StringSplitter(BaseStringSplitter,
+@@ -1446,7 +1463,7 @@ class StringSplitter(BaseStringSplitter,
                  characters expand to two columns).
              """
              result = self.line_length
@@ -1407,7 +1481,7 @@
              result -= 1 if ends_with_comma else 0
              result -= string_op_leaves_length
              return result
-@@ -1443,11 +1448,11 @@ class StringSplitter(BaseStringSplitter,
+@@ -1457,11 +1474,11 @@ class StringSplitter(BaseStringSplitter,
          # The last index of a string of length N is N-1.
          max_break_width -= 1
          # Leading whitespace is not present in the string value (e.g. Leaf.value).
@@ -1421,7 +1495,7 @@
              )
              return
  
-@@ -1744,7 +1749,9 @@ class StringSplitter(BaseStringSplitter,
+@@ -1758,7 +1775,9 @@ class StringSplitter(BaseStringSplitter,
  
      def _maybe_normalize_string_quotes(self, leaf: Leaf) -> None:
          if self.normalize_strings:
@@ -1432,7 +1506,7 @@
  
      def _normalize_f_string(self, string: str, prefix: str) -> str:
          """
-@@ -1866,7 +1873,8 @@ class StringParenWrapper(BaseStringSplit
+@@ -1881,7 +1900,8 @@ class StringParenWrapper(BaseStringSplit
                  char == " " or char in SPLIT_SAFE_CHARS for char in string_value
              ):
                  # And will still violate the line length limit when split...
@@ -1442,7 +1516,7 @@
                  if str_width(string_value) > max_string_width:
                      # And has no associated custom splits...
                      if not self.has_custom_splits(string_value):
-@@ -2112,7 +2120,7 @@ class StringParenWrapper(BaseStringSplit
+@@ -2127,7 +2147,7 @@ class StringParenWrapper(BaseStringSplit
          string_value = LL[string_idx].value
          string_line = Line(
              mode=line.mode,
