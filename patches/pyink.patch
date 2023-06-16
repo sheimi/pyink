@@ -681,7 +681,21 @@
          if leaves:
              # Since body is a new indent level, remove spurious leading whitespace.
              normalize_prefix(leaves[0], inside_brackets=True)
-@@ -1449,7 +1551,7 @@ def generate_trailers_to_omit(line: Line
+@@ -915,6 +1017,13 @@ def bracket_split_build_line(
+                     )
+                     if isinstance(node, Node) and isinstance(node.prev_sibling, Leaf)
+                 )
++                # Except the false negatives above for PEP 604 unions where we
++                # can't add the comma.
++                and not (
++                    leaves[0].parent
++                    and leaves[0].parent.next_sibling
++                    and leaves[0].parent.next_sibling.type == token.VBAR
++                )
+             )
+ 
+             if original.is_import or no_commas:
+@@ -1449,7 +1558,7 @@ def generate_trailers_to_omit(line: Line
      if not line.magic_trailing_comma:
          yield omit
  
