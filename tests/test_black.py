@@ -9,7 +9,6 @@ import os
 import re
 import sys
 import types
-import unittest
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stderr
 from dataclasses import replace
@@ -188,7 +187,9 @@ class BlackTestCase(BlackBaseTestCase):
         )
 
     def test_piping(self) -> None:
-        source, expected = read_data_from_file(PROJECT_ROOT / "src/pyink/__init__.py")
+        _, source, expected = read_data_from_file(
+            PROJECT_ROOT / "src/pyink/__init__.py"
+        )
         result = BlackRunner().invoke(
             pyink.main,
             [
@@ -210,8 +211,8 @@ class BlackTestCase(BlackBaseTestCase):
             r"(STDIN|STDOUT)\t\d\d\d\d-\d\d-\d\d \d\d:\d\d:\d\d\.\d\d\d\d\d\d"
             r"\+\d\d:\d\d"
         )
-        source, _ = read_data("simple_cases", "expression.py")
-        expected, _ = read_data("simple_cases", "expression.diff")
+        source, _ = read_data("cases", "expression.py")
+        expected, _ = read_data("cases", "expression.diff")
         args = [
             "-",
             "--fast",
@@ -228,7 +229,7 @@ class BlackTestCase(BlackBaseTestCase):
         self.assertEqual(expected, actual)
 
     def test_piping_diff_with_color(self) -> None:
-        source, _ = read_data("simple_cases", "expression.py")
+        source, _ = read_data("cases", "expression.py")
         args = [
             "-",
             "--fast",
@@ -264,7 +265,7 @@ class BlackTestCase(BlackBaseTestCase):
         pyink.assert_stable(source, actual, pyink.FileMode())
 
     def test_pep_572_version_detection(self) -> None:
-        source, _ = read_data("py_38", "pep_572")
+        source, _ = read_data("cases", "pep_572")
         root = pyink.lib2to3_parse(source)
         features = pyink.get_features_used(root)
         self.assertIn(pyink.Feature.ASSIGNMENT_EXPRESSIONS, features)
@@ -273,7 +274,7 @@ class BlackTestCase(BlackBaseTestCase):
 
     def test_pep_695_version_detection(self) -> None:
         for file in ("type_aliases", "type_params"):
-            source, _ = read_data("py_312", file)
+            source, _ = read_data("cases", file)
             root = pyink.lib2to3_parse(source)
             features = pyink.get_features_used(root)
             self.assertIn(pyink.Feature.TYPE_PARAMS, features)
@@ -281,7 +282,7 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertIn(pyink.TargetVersion.PY312, versions)
 
     def test_expression_ff(self) -> None:
-        source, expected = read_data("simple_cases", "expression.py")
+        source, expected = read_data("cases", "expression.py")
         tmp_file = Path(pyink.dump_to_file(source))
         try:
             self.assertTrue(ff(tmp_file, write_back=pyink.WriteBack.YES))
@@ -294,8 +295,8 @@ class BlackTestCase(BlackBaseTestCase):
             pyink.assert_stable(source, actual, DEFAULT_MODE)
 
     def test_expression_diff(self) -> None:
-        source, _ = read_data("simple_cases", "expression.py")
-        expected, _ = read_data("simple_cases", "expression.diff")
+        source, _ = read_data("cases", "expression.py")
+        expected, _ = read_data("cases", "expression.diff")
         tmp_file = Path(pyink.dump_to_file(source))
         diff_header = re.compile(
             rf"{re.escape(str(tmp_file))}\t\d\d\d\d-\d\d-\d\d "
@@ -320,8 +321,8 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(expected, actual, msg)
 
     def test_expression_diff_with_color(self) -> None:
-        source, _ = read_data("simple_cases", "expression.py")
-        expected, _ = read_data("simple_cases", "expression.diff")
+        source, _ = read_data("cases", "expression.py")
+        expected, _ = read_data("cases", "expression.diff")
         tmp_file = Path(pyink.dump_to_file(source))
         try:
             result = BlackRunner().invoke(
@@ -340,7 +341,7 @@ class BlackTestCase(BlackBaseTestCase):
         self.assertIn("\033[0m", actual)
 
     def test_detect_pos_only_arguments(self) -> None:
-        source, _ = read_data("py_38", "pep_570")
+        source, _ = read_data("cases", "pep_570")
         root = pyink.lib2to3_parse(source)
         features = pyink.get_features_used(root)
         self.assertIn(pyink.Feature.POS_ONLY_ARGUMENTS, features)
@@ -402,7 +403,7 @@ class BlackTestCase(BlackBaseTestCase):
             self.assertEqual(test_file.read_bytes(), expected)
 
     def test_skip_magic_trailing_comma(self) -> None:
-        source, _ = read_data("simple_cases", "expression")
+        source, _ = read_data("cases", "expression")
         expected, _ = read_data(
             "miscellaneous", "expression_skip_magic_trailing_comma.diff"
         )
@@ -434,7 +435,7 @@ class BlackTestCase(BlackBaseTestCase):
     @patch("pyink.dump_to_file", dump_to_stderr)
     def test_async_as_identifier(self) -> None:
         source_path = get_case_path("miscellaneous", "async_as_identifier")
-        source, expected = read_data_from_file(source_path)
+        _, source, expected = read_data_from_file(source_path)
         actual = fs(source)
         self.assertFormatEqual(expected, actual)
         major, minor = sys.version_info[:2]
@@ -448,8 +449,8 @@ class BlackTestCase(BlackBaseTestCase):
 
     @patch("pyink.dump_to_file", dump_to_stderr)
     def test_python37(self) -> None:
-        source_path = get_case_path("py_37", "python37")
-        source, expected = read_data_from_file(source_path)
+        source_path = get_case_path("cases", "python37")
+        _, source, expected = read_data_from_file(source_path)
         actual = fs(source)
         self.assertFormatEqual(expected, actual)
         major, minor = sys.version_info[:2]
@@ -885,7 +886,7 @@ class BlackTestCase(BlackBaseTestCase):
         self.assertEqual(pyink.get_features_used(node), {Feature.NUMERIC_UNDERSCORES})
         node = pyink.lib2to3_parse("123456\n")
         self.assertEqual(pyink.get_features_used(node), set())
-        source, expected = read_data("simple_cases", "function")
+        source, expected = read_data("cases", "function")
         node = pyink.lib2to3_parse(source)
         expected_features = {
             Feature.TRAILING_COMMA_IN_CALL,
@@ -895,7 +896,7 @@ class BlackTestCase(BlackBaseTestCase):
         self.assertEqual(pyink.get_features_used(node), expected_features)
         node = pyink.lib2to3_parse(expected)
         self.assertEqual(pyink.get_features_used(node), expected_features)
-        source, expected = read_data("simple_cases", "expression")
+        source, expected = read_data("cases", "expression")
         node = pyink.lib2to3_parse(source)
         self.assertEqual(pyink.get_features_used(node), set())
         node = pyink.lib2to3_parse(expected)
@@ -1047,9 +1048,10 @@ class BlackTestCase(BlackBaseTestCase):
         self.assertEqual(len(n.children), 1)
         self.assertEqual(n.children[0].type, pyink.token.ENDMARKER)
 
+    @patch("tests.conftest.PRINT_FULL_TREE", True)
+    @patch("tests.conftest.PRINT_TREE_DIFF", False)
     @pytest.mark.incompatible_with_mypyc
-    @unittest.skipIf(os.environ.get("SKIP_AST_PRINT"), "user set SKIP_AST_PRINT")
-    def test_assertFormatEqual(self) -> None:
+    def test_assertFormatEqual_print_full_tree(self) -> None:
         out_lines = []
         err_lines = []
 
@@ -1066,6 +1068,29 @@ class BlackTestCase(BlackBaseTestCase):
         out_str = "".join(out_lines)
         self.assertIn("Expected tree:", out_str)
         self.assertIn("Actual tree:", out_str)
+        self.assertEqual("".join(err_lines), "")
+
+    @patch("tests.conftest.PRINT_FULL_TREE", False)
+    @patch("tests.conftest.PRINT_TREE_DIFF", True)
+    @pytest.mark.incompatible_with_mypyc
+    def test_assertFormatEqual_print_tree_diff(self) -> None:
+        out_lines = []
+        err_lines = []
+
+        def out(msg: str, **kwargs: Any) -> None:
+            out_lines.append(msg)
+
+        def err(msg: str, **kwargs: Any) -> None:
+            err_lines.append(msg)
+
+        with patch("pyink.output._out", out), patch("pyink.output._err", err):
+            with self.assertRaises(AssertionError):
+                self.assertFormatEqual("j = [1, 2, 3]\n", "j = [1, 2, 3,]\n")
+
+        out_str = "".join(out_lines)
+        self.assertIn("Tree Diff:", out_str)
+        self.assertIn("+          COMMA", out_str)
+        self.assertIn("+ ','", out_str)
         self.assertEqual("".join(err_lines), "")
 
     @event_loop()
@@ -1086,7 +1111,7 @@ class BlackTestCase(BlackBaseTestCase):
             src1 = get_case_path("miscellaneous", "string_quotes")
             self.invokeBlack([str(src1), "--diff", "--check"], exit_code=1)
             # Files which will not be reformatted.
-            src2 = get_case_path("simple_cases", "composition")
+            src2 = get_case_path("cases", "composition")
             self.invokeBlack([str(src2), "--diff", "--check"])
             # Multi file command.
             self.invokeBlack([str(src1), str(src2), "--diff", "--check"], exit_code=1)
@@ -1309,7 +1334,7 @@ class BlackTestCase(BlackBaseTestCase):
             report = MagicMock()
             # Even with an existing file, since we are forcing stdin, black
             # should output to stdout and not modify the file inplace
-            p = THIS_DIR / "data" / "simple_cases" / "collections.py"
+            p = THIS_DIR / "data" / "cases" / "collections.py"
             # Make sure is_file actually returns True
             self.assertTrue(p.is_file())
             path = Path(f"__PYINK_STDIN_FILENAME__{p}")
@@ -1962,11 +1987,11 @@ class TestCaching:
         # If PYINK_CACHE_DIR is not set, use user_cache_dir
         monkeypatch.delenv("PYINK_CACHE_DIR", raising=False)
         with patch_user_cache_dir:
-            assert get_cache_dir() == workspace1
+            assert get_cache_dir().parent == workspace1
 
         # If it is set, use the path provided in the env var.
         monkeypatch.setenv("PYINK_CACHE_DIR", str(workspace2))
-        assert get_cache_dir() == workspace2
+        assert get_cache_dir().parent == workspace2
 
     def test_cache_broken_file(self) -> None:
         mode = DEFAULT_MODE
