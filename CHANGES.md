@@ -6,6 +6,10 @@ All notable changes to Pyink are recorded here.
 
 * Nothing notable unreleased.
 
+## 23.10.0
+
+This release is based on _Black_ v23.10.0.
+
 ## 23.9.1
 
 This release is based on _Black_ v23.9.1.
