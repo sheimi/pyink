@@ -15,11 +15,6 @@ from typing import (
     Iterator,
 )
 
-if sys.version_info < (3, 8):
-    from typing_extensions import Literal
-else:
-    from typing import Literal
-
 from blib2to3.pgen2.token import ASYNC, NEWLINE, STRING
 from blib2to3.pytree import type_repr
 from pyink.mode import Quote
