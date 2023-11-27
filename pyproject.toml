@@ -2,7 +2,7 @@
 # Yes, we use the _Black_ style to format _Pyink_ code.
 pyink = false
 line-length = 88
-target-version = ['py37', 'py38']
+target-version = ['py38']
 include = '\.pyi?$'
 extend-exclude = 'tests/data'
 preview = true
@@ -73,6 +73,8 @@ version = "{version}"
 [tool.hatch.build.targets.wheel]
 only-include = ["src"]
 sources = ["src"]
+# Note that we change the behaviour of this flag below
+macos-max-compat = true
 
 [tool.pytest.ini_options]
 # Option below requires `tests/optional.py`

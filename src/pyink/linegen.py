@@ -2,6 +2,7 @@
 Generating lines of code.
 """
 
+import re
 import sys
 from dataclasses import replace
 from enum import Enum, auto
@@ -454,7 +455,9 @@ class LineGenerator(Visitor[Line]):
         ):
             normalize_unicode_escape_sequences(leaf)
 
-        if is_docstring(leaf, self.mode.is_pyink) and "\\\n" not in leaf.value:
+        if is_docstring(leaf, self.mode.is_pyink) and not re.search(
+            r"\\\s*\n", leaf.value
+        ):
             # We're ignoring docstrings with backslash newline escapes because changing
             # indentation of those changes the AST representation of the code.
             if self.mode.string_normalization:
@@ -649,6 +652,7 @@ def transform_line(
             or line.contains_unsplittable_type_ignore()
         )
         and not (line.inside_brackets and line.contains_standalone_comments())
+        and not line.contains_implicit_multiline_string_with_comments()
     ):
         # Only apply basic string preprocessing, since lines shouldn't be split here.
         if Preview.string_processing in mode:
@@ -846,7 +850,7 @@ def _first_right_hand_split(
     omit: Collection[LeafID] = (),
 ) -> RHSResult:
     """Split the line into head, body, tail starting with the last bracket pair.
-    Note: this function should not have side effects. It's replied upon by
+    Note: this function should not have side effects. It's relied upon by
     _maybe_split_omitting_optional_parens to get an opinion whether to prefer
     splitting on the right side of an assignment statement.
     """
@@ -876,44 +880,58 @@ def _first_right_hand_split(
     body_leaves.reverse()
     head_leaves.reverse()
 
-    opening_brackets: List[Leaf] = [opening_bracket]
-    closing_brackets: List[Leaf] = [closing_bracket]
     body: Optional[Line] = None
-    if line.mode.is_pyink and not (
-        # Only look inside when it doesn't start with invisible parens.
-        opening_bracket.type == token.LPAR
-        and not opening_bracket.value
-        and closing_bracket.type == token.RPAR
-        and not closing_bracket.value
+    if (
+        Preview.hug_parens_with_braces_and_square_brackets in line.mode
+        and tail_leaves[0].value
+        and tail_leaves[0].opening_bracket is head_leaves[-1]
     ):
-        # Find an inner body...
         inner_body_leaves = list(body_leaves)
-        inner_opening_brackets: List[Leaf] = []
-        inner_closing_brackets: List[Leaf] = []
+        hugged_opening_leaves: List[Leaf] = []
+        hugged_closing_leaves: List[Leaf] = []
+        is_unpacking = body_leaves[0].type in [token.STAR, token.DOUBLESTAR]
+        unpacking_offset: int = 1 if is_unpacking else 0
         while (
-            len(inner_body_leaves) >= 2
-            and inner_body_leaves[0].type in OPENING_BRACKETS
+            len(inner_body_leaves) >= 2 + unpacking_offset
             and inner_body_leaves[-1].type in CLOSING_BRACKETS
-            and inner_body_leaves[-1].opening_bracket is inner_body_leaves[0]
+            and inner_body_leaves[-1].opening_bracket
+            is inner_body_leaves[unpacking_offset]
         ):
-            inner_opening_brackets.append(inner_body_leaves.pop(0))
-            inner_closing_brackets.insert(0, inner_body_leaves.pop())
-        if len(inner_body_leaves) < len(body_leaves):
+            if unpacking_offset:
+                hugged_opening_leaves.append(inner_body_leaves.pop(0))
+                unpacking_offset = 0
+            hugged_opening_leaves.append(inner_body_leaves.pop(0))
+            hugged_closing_leaves.insert(0, inner_body_leaves.pop())
+
+        if hugged_opening_leaves and inner_body_leaves:
             inner_body = bracket_split_build_line(
                 inner_body_leaves,
                 line,
-                opening_brackets[0],
+                hugged_opening_leaves[-1],
                 component=_BracketSplitComponent.body,
             )
-            if inner_body.should_split_rhs or (
-                inner_body_leaves and inner_body_leaves[-1].type == token.COMMA
+            if (
+                line.mode.magic_trailing_comma
+                and inner_body_leaves[-1].type == token.COMMA
             ):
-                # Only when the inner body itself will be split or ends with a comma,
-                # should we prefer not break immediately nested brackets.
+                should_hug = True
+            else:
+                line_length = line.mode.line_length - sum(
+                    len(str(leaf))
+                    for leaf in hugged_opening_leaves + hugged_closing_leaves
+                )
+                if is_line_short_enough(
+                    inner_body, mode=replace(line.mode, line_length=line_length)
+                ):
+                    # Do not hug if it fits on a single line.
+                    should_hug = False
+                else:
+                    should_hug = True
+            if should_hug:
                 body_leaves = inner_body_leaves
-                head_leaves.extend(inner_opening_brackets)
-                tail_leaves = inner_closing_brackets + tail_leaves
-                body = inner_body  # No need to re-calculate body.
+                head_leaves.extend(hugged_opening_leaves)
+                tail_leaves = hugged_closing_leaves + tail_leaves
+                body = inner_body  # No need to re-calculate the body again later.
 
     head = bracket_split_build_line(
         head_leaves, line, opening_bracket, component=_BracketSplitComponent.head
@@ -947,8 +965,6 @@ def _maybe_split_omitting_optional_parens(
         # it's not an import (optional parens are the only thing we can split on
         # in this case; attempting a split without them is a waste of time)
         and not line.is_import
-        # there are no standalone comments in the body
-        and not rhs.body.contains_standalone_comments(0)
         # and we can actually remove the parens
         and can_omit_invisible_parens(rhs, mode.line_length)
     ):
@@ -1274,7 +1290,7 @@ def standalone_comment_split(
     line: Line, features: Collection[Feature], mode: Mode
 ) -> Iterator[Line]:
     """Split standalone comments from the rest of the line."""
-    if not line.contains_standalone_comments(0):
+    if not line.contains_standalone_comments():
         raise CannotSplit("Line does not have any standalone comments")
 
     current_line = Line(
@@ -1322,7 +1338,7 @@ def normalize_prefix(leaf: Leaf, *, inside_brackets: bool) -> None:
     leaf.prefix = ""
 
 
-def normalize_invisible_parens(
+def normalize_invisible_parens(  # noqa: C901
     node: Node, parens_after: Set[str], *, mode: Mode, features: Collection[Feature]
 ) -> None:
     """Make existing optional parentheses invisible or create new ones.
@@ -1351,6 +1367,17 @@ def normalize_invisible_parens(
         if isinstance(child, Node) and child.type == syms.annassign:
             normalize_invisible_parens(
                 child, parens_after=parens_after, mode=mode, features=features
+            )
+
+        # Fixes a bug where invisible parens are not properly wrapped around
+        # case blocks.
+        if (
+            isinstance(child, Node)
+            and child.type == syms.case_block
+            and Preview.long_case_block_line_splitting in mode
+        ):
+            normalize_invisible_parens(
+                child, parens_after={"case"}, mode=mode, features=features
             )
 
         # Add parentheses around long tuple unpacking in assignments.
@@ -1397,6 +1424,17 @@ def normalize_invisible_parens(
                 # of the keyword. So we need to skip the insertion of
                 # invisible parentheses to work more precisely.
                 continue
+
+            elif (
+                isinstance(child, Leaf)
+                and child.next_sibling is not None
+                and child.next_sibling.type == token.COLON
+                and child.value == "case"
+                and Preview.long_case_block_line_splitting in mode
+            ):
+                # A special patch for "case case:" scenario, the second occurrence
+                # of case will be not parsed as a Python keyword.
+                break
 
             elif not (isinstance(child, Leaf) and is_multiline_string(child)):
                 wrap_in_parentheses(node, child, visible=False)
@@ -1445,18 +1483,16 @@ def remove_await_parens(node: Node) -> None:
             opening_bracket = cast(Leaf, node.children[1].children[0])
             closing_bracket = cast(Leaf, node.children[1].children[-1])
             bracket_contents = node.children[1].children[1]
-            if isinstance(bracket_contents, Node):
-                if bracket_contents.type != syms.power:
-                    ensure_visible(opening_bracket)
-                    ensure_visible(closing_bracket)
-                elif (
-                    bracket_contents.type == syms.power
-                    and bracket_contents.children[0].type == token.AWAIT
-                ):
-                    ensure_visible(opening_bracket)
-                    ensure_visible(closing_bracket)
-                    # If we are in a nested await then recurse down.
-                    remove_await_parens(bracket_contents)
+            if isinstance(bracket_contents, Node) and (
+                bracket_contents.type != syms.power
+                or bracket_contents.children[0].type == token.AWAIT
+                or any(
+                    isinstance(child, Leaf) and child.type == token.DOUBLESTAR
+                    for child in bracket_contents.children
+                )
+            ):
+                ensure_visible(opening_bracket)
+                ensure_visible(closing_bracket)
 
 
 def _maybe_wrap_cms_in_parens(

@@ -4,7 +4,8 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-* Nothing notable unreleased.
+* The CLI option `--pyink-lines` is now deprecated and replaced by _Black_'s
+  built-in option `--line-ranges`.
 
 ## 23.10.0
 

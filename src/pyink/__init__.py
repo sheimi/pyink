@@ -51,6 +51,7 @@ from pyink.files import (
     get_gitignore,
     normalize_path_maybe_ignore,
     parse_pyproject_toml,
+    path_is_excluded,
     wrap_stream_for_windows,
 )
 from pyink.handle_ipynb_magics import (
@@ -78,7 +79,7 @@ from pyink.output import color_diff, diff, dump_to_file, err, ipynb_diff, out
 from pyink.parsing import InvalidInput  # noqa F401
 from pyink.parsing import lib2to3_parse, parse_ast, stringify_ast
 from pyink import ink
-from pyink import ink_adjusted_lines
+from pyink.ranges import adjusted_lines, convert_unchanged_lines, parse_line_ranges
 from pyink.report import Changed, NothingChanged, Report
 from pyink.trans import iter_fexpr_spans
 from blib2to3.pgen2 import token
@@ -163,6 +164,12 @@ def read_pyproject_toml(
     if extend_exclude is not None and not isinstance(extend_exclude, str):
         raise click.BadOptionUsage(
             "extend-exclude", "Config key extend-exclude must be a string"
+        )
+
+    line_ranges = config.get("line_ranges")
+    if line_ranges is not None:
+        raise click.BadOptionUsage(
+            "line-ranges", "Cannot use line-ranges in the pyproject.toml file."
         )
 
     default_map: Dict[str, Any] = {}
@@ -312,11 +319,8 @@ def validate_regex(
     "--pyink-lines",
     multiple=True,
     metavar="START-END",
-    help=(
-        'Range of lines to format. Must be specified as "START-END", index is'
-        " 1-based and inclusive on both ends."
-    ),
-    default=None,
+    help="Deprecated and replaced by --line-ranges",
+    default=(),
 )
 @click.option(
     "--pyink-use-majority-quotes",
@@ -340,6 +344,19 @@ def validate_regex(
     "--diff",
     is_flag=True,
     help="Don't write the files back, just output a diff for each file on stdout.",
+)
+@click.option(
+    "--line-ranges",
+    multiple=True,
+    metavar="START-END",
+    help=(
+        "When specified, _Black_ will try its best to only format these lines. This"
+        " option can be specified multiple times, and a union of the lines will be"
+        " formatted. Each range must be specified as two integers connected by a `-`:"
+        " `<START>-<END>`. The `<START>` and `<END>` integer indices are 1-based and"
+        " inclusive on both ends."
+    ),
+    default=(),
 )
 @click.option(
     "--color/--no-color",
@@ -480,6 +497,7 @@ def main(  # noqa: C901
     target_version: List[TargetVersion],
     check: bool,
     diff: bool,
+    line_ranges: Sequence[str],
     color: bool,
     fast: bool,
     pyi: bool,
@@ -492,7 +510,7 @@ def main(  # noqa: C901
     preview: bool,
     pyink: bool,
     pyink_indentation: str,
-    pyink_lines: Optional[Sequence[str]],
+    pyink_lines: Sequence[str],
     pyink_use_majority_quotes: bool,
     quiet: bool,
     verbose: bool,
@@ -591,28 +609,29 @@ def main(  # noqa: C901
         ),
     )
 
-    lines: Optional[List[Tuple[int, int]]] = None
-    if pyink_lines is not None:
-        lines = []
-        for lines_str in pyink_lines:
-            parts = lines_str.split("-")
-            if len(parts) != 2:
-                err(
-                    "Incorrect --pyink-lines format, expect 'START-END', found"
-                    f" {lines_str!r}"
-                )
-                ctx.exit(1)
+    lines: List[Tuple[int, int]] = []
+    if line_ranges:
+        if ipynb:
+            err("Cannot use --line-ranges with ipynb files.")
+            ctx.exit(1)
+
+        try:
+            lines = parse_line_ranges(line_ranges)
+        except ValueError as e:
+            err(str(e))
+            ctx.exit(1)
+
+    if pyink_lines:
+        out(
+            "WARNING: --pyink-lines= is deprecated and replaced by --line-ranges=.",
+            fg="yellow",
+        )
+        if not lines:
             try:
-                start = int(parts[0])
-                end = int(parts[1])
-            except ValueError:
-                err(
-                    "Incorrect --pyink-lines value, expect integer ranges, found"
-                    f" {lines_str!r}"
-                )
+                lines = parse_line_ranges(pyink_lines)
+            except ValueError as e:
+                err(str(e))
                 ctx.exit(1)
-            else:
-                lines.append((start, end))
 
     if code is not None:
         # Run in quiet mode by default with -c; the extra output isn't useful.
@@ -623,7 +642,12 @@ def main(  # noqa: C901
 
     if code is not None:
         reformat_code(
-            content=code, fast=fast, write_back=write_back, mode=mode, report=report
+            content=code,
+            fast=fast,
+            write_back=write_back,
+            mode=mode,
+            report=report,
+            lines=lines,
         )
     else:
         assert root is not None  # root is only None if code is not None
@@ -663,6 +687,9 @@ def main(  # noqa: C901
         else:
             from pyink.concurrency import reformat_many
 
+            if lines:
+                err("Cannot use --line-ranges to format multiple files.")
+                ctx.exit(1)
             reformat_many(
                 sources=sources,
                 fast=fast,
@@ -704,57 +731,57 @@ def get_sources(
 
     for s in src:
         if s == "-" and stdin_filename:
-            p = Path(stdin_filename)
+            path = Path(stdin_filename)
             is_stdin = True
         else:
-            p = Path(s)
+            path = Path(s)
             is_stdin = False
 
-        if is_stdin or p.is_file():
+        # Compare the logic here to the logic in `gen_python_files`.
+        if is_stdin or path.is_file():
+            root_relative_path = path.absolute().relative_to(root).as_posix()
+
+            root_relative_path = "/" + root_relative_path
+
+            # Hard-exclude any files that matches the `--force-exclude` regex.
+            if path_is_excluded(root_relative_path, force_exclude):
+                report.path_ignored(
+                    path, "matches the --force-exclude regular expression"
+                )
+                continue
+
             normalized_path: Optional[str] = normalize_path_maybe_ignore(
-                p, root, report
+                path, root, report
             )
             if normalized_path is None:
                 if verbose:
                     out(f'Skipping invalid source: "{normalized_path}"', fg="red")
                 continue
-            if verbose:
-                out(f'Found input source: "{normalized_path}"', fg="blue")
-
-            normalized_path = "/" + normalized_path
-            # Hard-exclude any files that matches the `--force-exclude` regex.
-            if force_exclude:
-                force_exclude_match = force_exclude.search(normalized_path)
-            else:
-                force_exclude_match = None
-            if force_exclude_match and force_exclude_match.group(0):
-                report.path_ignored(p, "matches the --force-exclude regular expression")
-                continue
 
             if is_stdin:
-                p = Path(f"{STDIN_PLACEHOLDER}{str(p)}")
+                path = Path(f"{STDIN_PLACEHOLDER}{str(path)}")
 
-            if p.suffix == ".ipynb" and not jupyter_dependencies_are_installed(
+            if path.suffix == ".ipynb" and not jupyter_dependencies_are_installed(
                 warn=verbose or not quiet
             ):
                 continue
 
-            sources.add(p)
-        elif p.is_dir():
-            p_relative = normalize_path_maybe_ignore(p, root, report)
-            assert p_relative is not None
-            p = root / p_relative
             if verbose:
-                out(f'Found input source directory: "{p}"', fg="blue")
+                out(f'Found input source: "{normalized_path}"', fg="blue")
+            sources.add(path)
+        elif path.is_dir():
+            path = root / (path.resolve().relative_to(root))
+            if verbose:
+                out(f'Found input source directory: "{path}"', fg="blue")
 
             if using_default_exclude:
                 gitignore = {
                     root: root_gitignore,
-                    p: get_gitignore(p),
+                    path: get_gitignore(path),
                 }
             sources.update(
                 gen_python_files(
-                    p.iterdir(),
+                    path.iterdir(),
                     root,
                     include,
                     exclude,
@@ -769,7 +796,7 @@ def get_sources(
         elif s == "-":
             if verbose:
                 out("Found input source stdin", fg="blue")
-            sources.add(p)
+            sources.add(path)
         else:
             err(f"invalid path: {s}")
 
@@ -789,7 +816,13 @@ def path_empty(
 
 
 def reformat_code(
-    content: str, fast: bool, write_back: WriteBack, mode: Mode, report: Report
+    content: str,
+    fast: bool,
+    write_back: WriteBack,
+    mode: Mode,
+    report: Report,
+    *,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> None:
     """
     Reformat and print out `content` without spawning child processes.
@@ -802,7 +835,7 @@ def reformat_code(
     try:
         changed = Changed.NO
         if format_stdin_to_stdout(
-            content=content, fast=fast, write_back=write_back, mode=mode
+            content=content, fast=fast, write_back=write_back, mode=mode, lines=lines
         ):
             changed = Changed.YES
         report.done(path, changed)
@@ -822,7 +855,7 @@ def reformat_one(
     mode: Mode,
     report: "Report",
     *,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> None:
     """Reformat a single file under `src` without spawning child processes.
 
@@ -878,7 +911,7 @@ def format_file_in_place(
     write_back: WriteBack = WriteBack.NO,
     lock: Any = None,  # multiprocessing.Manager().Lock() is some crazy proxy
     *,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> bool:
     """Format file under `src` path. Return True if changed.
 
@@ -945,7 +978,7 @@ def format_stdin_to_stdout(
     content: Optional[str] = None,
     write_back: WriteBack = WriteBack.NO,
     mode: Mode,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> bool:
     """Format file on stdin. Return True if changed.
 
@@ -996,7 +1029,7 @@ def check_stability_and_equivalence(
     dst_contents: str,
     *,
     mode: Mode,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> None:
     """Perform stability and equivalence checks.
 
@@ -1013,7 +1046,7 @@ def format_file_contents(
     *,
     fast: bool,
     mode: Mode,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    lines: Collection[Tuple[int, int]] = (),
 ) -> FileContent:
     """Reformat contents of a file and return new contents.
 
@@ -1144,10 +1177,7 @@ def format_ipynb_string(src_contents: str, *, fast: bool, mode: Mode) -> FileCon
 
 
 def format_str(
-    src_contents: str,
-    *,
-    mode: Mode,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    src_contents: str, *, mode: Mode, lines: Collection[Tuple[int, int]] = ()
 ) -> str:
     """Reformat a string and return new contents.
 
@@ -1177,27 +1207,20 @@ def format_str(
     ) -> None:
         hey
 
-    `lines` is either None or a list of tuples of integers. Each tuple
-    [start, end] in the list corresponds to a line range to format. They are
-    1-based and inclusive on both ends. When not None, the formatting will be
-    restricted to those lines whenever possible.
     """
     dst_contents = _format_str_once(src_contents, mode=mode, lines=lines)
     # Forced second pass to work around optional trailing commas (becoming
     # forced trailing commas on pass 2) interacting differently with optional
     # parentheses.  Admittedly ugly.
     if src_contents != dst_contents:
-        if lines is not None:
-            lines = ink_adjusted_lines.adjusted_lines(lines, src_contents, dst_contents)
+        if lines:
+            lines = adjusted_lines(lines, src_contents, dst_contents)
         return _format_str_once(dst_contents, mode=mode, lines=lines)
     return dst_contents
 
 
 def _format_str_once(
-    src_contents: str,
-    *,
-    mode: Mode,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    src_contents: str, *, mode: Mode, lines: Collection[Tuple[int, int]] = ()
 ) -> str:
     src_node = lib2to3_parse(src_contents.lstrip(), mode.target_versions)
     dst_blocks: List[LinesBlock] = []
@@ -1214,11 +1237,10 @@ def _format_str_once(
         for feature in {Feature.PARENTHESIZED_CONTEXT_MANAGERS}
         if supports_feature(versions, feature)
     }
-    normalize_fmt_off(src_node)
-
+    normalize_fmt_off(src_node, mode)
     if lines:
         # This should be called after normalize_fmt_off.
-        ink.convert_unchanged_lines(src_node, lines)
+        convert_unchanged_lines(src_node, lines)
 
     line_generator = LineGenerator(mode=mode, features=context_manager_features)
     elt = EmptyLineTracker(mode=mode)
@@ -1497,18 +1519,14 @@ def assert_equivalent(src: str, dst: str) -> None:
 
 
 def assert_stable(
-    src: str,
-    dst: str,
-    mode: Mode,
-    *,
-    lines: Optional[Collection[Tuple[int, int]]] = None,
+    src: str, dst: str, mode: Mode, *, lines: Collection[Tuple[int, int]] = ()
 ) -> None:
     """Raise AssertionError if `dst` reformats differently the second time."""
     # We shouldn't call format_str() here, because that formats the string
     # twice and may hide a bug where we bounce back and forth between two
     # versions.
-    if lines is not None:
-        lines = ink_adjusted_lines.adjusted_lines(lines, src, dst)
+    if lines:
+        lines = adjusted_lines(lines, src, dst)
     newdst = _format_str_once(dst, mode=mode, lines=lines)
     if dst != newdst:
         log = dump_to_file(

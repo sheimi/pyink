@@ -14,7 +14,7 @@ from mypy_extensions import mypyc_attr
 
 from pyink.cache import CACHE_DIR
 from pyink.mode import Mode, Preview
-from pyink.strings import has_triple_quotes
+from pyink.strings import get_string_prefix, has_triple_quotes
 from blib2to3 import pygram
 from blib2to3.pgen2 import token
 from blib2to3.pytree import NL, Leaf, Node, type_repr
@@ -525,6 +525,13 @@ def is_arith_like(node: LN) -> bool:
 
 
 def is_docstring(leaf: Leaf, is_pyink: bool) -> bool:
+    if leaf.type != token.STRING:
+        return False
+
+    prefix = get_string_prefix(leaf.value)
+    if set(prefix).intersection("bBfF"):
+        return False
+
     if prev_siblings_are(
         leaf.parent, [None, token.NEWLINE, token.INDENT, syms.simple_stmt]
     ):
@@ -726,6 +733,10 @@ def is_vararg(leaf: Leaf, within: Set[NodeType]) -> bool:
 def is_multiline_string(leaf: Leaf) -> bool:
     """Return True if `leaf` is a multiline string that actually spans many lines."""
     return has_triple_quotes(leaf.value) and "\n" in leaf.value
+
+
+def is_funcdef(node: Node) -> bool:
+    return node.type == syms.funcdef
 
 
 def is_stub_suite(node: Node) -> bool:
@@ -934,3 +945,31 @@ def is_part_of_annotation(leaf: Leaf) -> bool:
             return True
         ancestor = ancestor.parent
     return False
+
+
+def first_leaf(node: LN) -> Optional[Leaf]:
+    """Returns the first leaf of the ancestor node."""
+    if isinstance(node, Leaf):
+        return node
+    elif not node.children:
+        return None
+    else:
+        return first_leaf(node.children[0])
+
+
+def last_leaf(node: LN) -> Optional[Leaf]:
+    """Returns the last leaf of the ancestor node."""
+    if isinstance(node, Leaf):
+        return node
+    elif not node.children:
+        return None
+    else:
+        return last_leaf(node.children[-1])
+
+
+def furthest_ancestor_with_last_leaf(leaf: Leaf) -> LN:
+    """Returns the furthest ancestor that has this leaf node as the last leaf."""
+    node: LN = leaf
+    while node.parent and node.parent.children and node is node.parent.children[-1]:
+        node = node.parent
+    return node

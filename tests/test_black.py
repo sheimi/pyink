@@ -8,6 +8,7 @@ import multiprocessing
 import os
 import re
 import sys
+import textwrap
 import types
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager, redirect_stderr
@@ -504,7 +505,7 @@ class BlackTestCase(BlackBaseTestCase):
             return _mocked_calls
 
         with patch("pathlib.Path.iterdir", return_value=target_contents), patch(
-            "pathlib.Path.cwd", return_value=working_directory
+            "pathlib.Path.resolve", return_value=target_abspath
         ), patch("pathlib.Path.is_dir", side_effect=mock_n_calls([True])):
             # Note that the root folder (project_root) isn't the folder
             # named "root" (aka working_directory)
@@ -526,7 +527,8 @@ class BlackTestCase(BlackBaseTestCase):
             for _, mock_args, _ in report.path_ignored.mock_calls
         ), "A symbolic link was reported."
         report.path_ignored.assert_called_once_with(
-            Path("root", "child", "b.py"), "matches a .gitignore file content"
+            Path(working_directory, "child", "b.py"),
+            "matches a .gitignore file content",
         )
 
     def test_report_verbose(self) -> None:
@@ -1268,7 +1270,7 @@ class BlackTestCase(BlackBaseTestCase):
                 report=report,
             )
             fsts.assert_called_once_with(
-                fast=True, write_back=pyink.WriteBack.YES, mode=DEFAULT_MODE, lines=None
+                fast=True, write_back=pyink.WriteBack.YES, mode=DEFAULT_MODE, lines=()
             )
             # __PYINK_STDIN_FILENAME__ should have been stripped
             report.done.assert_called_with(expected, pyink.Changed.YES)
@@ -1294,7 +1296,7 @@ class BlackTestCase(BlackBaseTestCase):
                 fast=True,
                 write_back=pyink.WriteBack.YES,
                 mode=replace(DEFAULT_MODE, is_pyi=True),
-                lines=None,
+                lines=(),
             )
             # __PYINK_STDIN_FILENAME__ should have been stripped
             report.done.assert_called_with(expected, pyink.Changed.YES)
@@ -1320,7 +1322,7 @@ class BlackTestCase(BlackBaseTestCase):
                 fast=True,
                 write_back=pyink.WriteBack.YES,
                 mode=replace(DEFAULT_MODE, is_ipynb=True),
-                lines=None,
+                lines=(),
             )
             # __PYINK_STDIN_FILENAME__ should have been stripped
             report.done.assert_called_with(expected, pyink.Changed.YES)
@@ -1406,28 +1408,6 @@ class BlackTestCase(BlackBaseTestCase):
             except io.UnsupportedOperation:
                 pass  # StringIO does not support detach
             assert output.getvalue() == ""
-
-    def test_format_stdin_to_stdout_with_lines(self) -> None:
-        contents = """\
-def func1(): pass
-def func2(): pass
-"""
-        formatted = """\
-def func1():
-    pass
-
-
-def func2(): pass
-"""
-        runner = BlackRunner()
-        result = runner.invoke(
-            pyink.main,
-            ["-", "--fast", "--pyink-lines=1-1"],
-            input=BytesIO(contents.encode("utf8")),
-        )
-        self.assertEqual(result.exit_code, 0)
-        output = result.stdout_bytes.decode("utf8")
-        assert output == formatted
 
     def test_invalid_cli_regex(self) -> None:
         for option in ["--include", "--exclude", "--extend-exclude", "--force-exclude"]:
@@ -1964,6 +1944,88 @@ def func2(): pass
         err.match("invalid character")
         err.match(r"\(<unknown>, line 1\)")
 
+    def test_line_ranges_with_code_option(self) -> None:
+        code = textwrap.dedent("""\
+            if  a  ==  b:
+                print  ( "OK" )
+            """)
+        args = ["--line-ranges=1-1", "--code", code]
+        result = CliRunner().invoke(pyink.main, args)
+
+        expected = textwrap.dedent("""\
+            if a == b:
+                print  ( "OK" )
+            """)
+        self.compare_results(result, expected, expected_exit_code=0)
+
+    def test_line_ranges_with_stdin(self) -> None:
+        code = textwrap.dedent("""\
+            if  a  ==  b:
+                print  ( "OK" )
+            """)
+        runner = BlackRunner()
+        result = runner.invoke(
+            pyink.main, ["--line-ranges=1-1", "-"], input=BytesIO(code.encode("utf-8"))
+        )
+
+        expected = textwrap.dedent("""\
+            if a == b:
+                print  ( "OK" )
+            """)
+        self.compare_results(result, expected, expected_exit_code=0)
+
+    def test_line_ranges_with_source(self) -> None:
+        with TemporaryDirectory() as workspace:
+            test_file = Path(workspace) / "test.py"
+            test_file.write_text(
+                textwrap.dedent("""\
+            if  a  ==  b:
+                print  ( "OK" )
+            """),
+                encoding="utf-8",
+            )
+            args = ["--line-ranges=1-1", str(test_file)]
+            result = CliRunner().invoke(pyink.main, args)
+            assert not result.exit_code
+
+            formatted = test_file.read_text(encoding="utf-8")
+            expected = textwrap.dedent("""\
+            if a == b:
+                print  ( "OK" )
+            """)
+            assert expected == formatted
+
+    def test_line_ranges_with_multiple_sources(self) -> None:
+        with TemporaryDirectory() as workspace:
+            test1_file = Path(workspace) / "test1.py"
+            test1_file.write_text("", encoding="utf-8")
+            test2_file = Path(workspace) / "test2.py"
+            test2_file.write_text("", encoding="utf-8")
+            args = ["--line-ranges=1-1", str(test1_file), str(test2_file)]
+            result = CliRunner().invoke(pyink.main, args)
+            assert result.exit_code == 1
+            assert "Cannot use --line-ranges to format multiple files" in result.output
+
+    def test_line_ranges_with_ipynb(self) -> None:
+        with TemporaryDirectory() as workspace:
+            test_file = Path(workspace) / "test.ipynb"
+            test_file.write_text("{}", encoding="utf-8")
+            args = ["--line-ranges=1-1", "--ipynb", str(test_file)]
+            result = CliRunner().invoke(pyink.main, args)
+            assert "Cannot use --line-ranges with ipynb files" in result.output
+            assert result.exit_code == 1
+
+    def test_line_ranges_in_pyproject_toml(self) -> None:
+        config = THIS_DIR / "data" / "invalid_line_ranges.toml"
+        result = BlackRunner().invoke(
+            pyink.main, ["--code", "print()", "--config", str(config)]
+        )
+        assert result.exit_code == 2
+        assert result.stderr_bytes is not None
+        assert (
+            b"Cannot use line-ranges in the pyproject.toml file." in result.stderr_bytes
+        )
+
 
 class TestCaching:
     def test_get_cache_dir(
@@ -2412,6 +2474,27 @@ class TestFileCollection:
         # Setting exclude explicitly to an empty string to block .gitignore usage.
         assert_collected_sources(src, expected, include="", exclude="")
 
+    def test_include_absolute_path(self) -> None:
+        path = DATA_DIR / "include_exclude_tests"
+        src = [path]
+        expected = [
+            Path(path / "b/dont_exclude/a.pie"),
+        ]
+        assert_collected_sources(
+            src, expected, root=path, include=r"^/b/dont_exclude/a\.pie$", exclude=""
+        )
+
+    def test_exclude_absolute_path(self) -> None:
+        path = DATA_DIR / "include_exclude_tests"
+        src = [path]
+        expected = [
+            Path(path / "b/dont_exclude/a.py"),
+            Path(path / "b/.definitely_exclude/a.py"),
+        ]
+        assert_collected_sources(
+            src, expected, root=path, include=r"\.py$", exclude=r"^/b/exclude/a\.py$"
+        )
+
     def test_extend_exclude(self) -> None:
         path = DATA_DIR / "include_exclude_tests"
         src = [path]
@@ -2425,7 +2508,6 @@ class TestFileCollection:
 
     @pytest.mark.incompatible_with_mypyc
     def test_symlinks(self) -> None:
-        path = MagicMock()
         root = THIS_DIR.resolve()
         include = re.compile(pyink.DEFAULT_INCLUDES)
         exclude = re.compile(pyink.DEFAULT_EXCLUDES)
@@ -2433,19 +2515,44 @@ class TestFileCollection:
         gitignore = PathSpec.from_lines("gitwildmatch", [])
 
         regular = MagicMock()
-        outside_root_symlink = MagicMock()
-        ignored_symlink = MagicMock()
-
-        path.iterdir.return_value = [regular, outside_root_symlink, ignored_symlink]
-
         regular.absolute.return_value = root / "regular.py"
         regular.resolve.return_value = root / "regular.py"
         regular.is_dir.return_value = False
+        regular.is_file.return_value = True
 
+        outside_root_symlink = MagicMock()
         outside_root_symlink.absolute.return_value = root / "symlink.py"
         outside_root_symlink.resolve.return_value = Path("/nowhere")
+        outside_root_symlink.is_dir.return_value = False
+        outside_root_symlink.is_file.return_value = True
 
+        ignored_symlink = MagicMock()
         ignored_symlink.absolute.return_value = root / ".mypy_cache" / "symlink.py"
+        ignored_symlink.is_dir.return_value = False
+        ignored_symlink.is_file.return_value = True
+
+        # A symlink that has an excluded name, but points to an included name
+        symlink_excluded_name = MagicMock()
+        symlink_excluded_name.absolute.return_value = root / "excluded_name"
+        symlink_excluded_name.resolve.return_value = root / "included_name.py"
+        symlink_excluded_name.is_dir.return_value = False
+        symlink_excluded_name.is_file.return_value = True
+
+        # A symlink that has an included name, but points to an excluded name
+        symlink_included_name = MagicMock()
+        symlink_included_name.absolute.return_value = root / "included_name.py"
+        symlink_included_name.resolve.return_value = root / "excluded_name"
+        symlink_included_name.is_dir.return_value = False
+        symlink_included_name.is_file.return_value = True
+
+        path = MagicMock()
+        path.iterdir.return_value = [
+            regular,
+            outside_root_symlink,
+            ignored_symlink,
+            symlink_excluded_name,
+            symlink_included_name,
+        ]
 
         files = list(
             pyink.gen_python_files(
@@ -2461,7 +2568,7 @@ class TestFileCollection:
                 quiet=False,
             )
         )
-        assert files == [regular]
+        assert files == [regular, symlink_included_name]
 
         path.iterdir.assert_called_once()
         outside_root_symlink.resolve.assert_called_once()
@@ -2611,25 +2718,6 @@ class TestFileCollection:
         assert "-from" not in stdout
         assert "- pass\n+    pass\n" in stdout
 
-    @pytest.mark.parametrize(
-        "value,message",
-        [
-            ("1,2", "Incorrect --pyink-lines format, expect 'START-END'"),
-            (
-                "start-end",
-                "Incorrect --pyink-lines value, expect integer ranges, found",
-            ),
-        ],
-    )
-    def test_pyink_lines_incorrect(self, value, message) -> None:
-        path = THIS_DIR / "data" / "pyink_configs"
-        example = str(path / "example.py")
-        result = BlackRunner().invoke(pyink.main, [f"--pyink-lines={value}", example])
-        assert result.exit_code == 1
-        assert result.stderr_bytes is not None
-
-        assert message in result.stderr_bytes.decode()
-
     def test_pyink_use_majority_quotes(self) -> None:
         path = THIS_DIR / "data" / "pyink_configs"
         example = str(path / "majority_quotes.py")
@@ -2642,6 +2730,23 @@ class TestFileCollection:
 
         diff = """-_double = "Double"\n+_double = 'Double'\n"""
         assert diff in self.decode_and_normalized(result.stdout_bytes)
+
+    @patch("pyink.find_project_root", lambda *args: (THIS_DIR.resolve(), None))
+    def test_get_sources_with_stdin_filename_and_force_exclude_and_symlink(
+        self,
+    ) -> None:
+        # Force exclude should exclude a symlink based on the symlink, not its target
+        path = THIS_DIR / "data" / "include_exclude_tests"
+        stdin_filename = str(path / "symlink.py")
+        expected = [f"__PYINK_STDIN_FILENAME__{stdin_filename}"]
+        target = path / "b/exclude/a.py"
+        with patch("pathlib.Path.resolve", return_value=target):
+            assert_collected_sources(
+                src=["-"],
+                expected=expected,
+                force_exclude=r"exclude/a\.py",
+                stdin_filename=stdin_filename,
+            )
 
 
 class TestDeFactoAPI:

@@ -15,9 +15,6 @@ patches as possible in the future.
 
 # What are the main differences?
 
-*   Support only formatting selected line ranges, using the `--pyink-lines=`
-    argument (see [psf/black#830](https://github.com/psf/black/issues/830)).
-
 *   Support two-space indentation, using the `pyink-indentation` option.
 
 *   Support inferring preferred quote style by calculating the majority in a
@@ -47,39 +44,6 @@ patches as possible in the future.
     # Black:
     from very_long_top_level_package_name.sub_package.another_level import (
         a_long_module,
-    )
-    ```
-
-*   Prefer not breaking lines between immediately nested brackets (see
-    [psf/black#1811](https://github.com/psf/black/issues/1811)). Example:
-
-    ```python
-    # Pyink:
-    secrets = frozenset({
-        1001,
-        1002,
-        1003,
-        1004,
-        1005,
-        1006,
-        1007,
-        1008,
-        1009,
-    })
-
-    # Black:
-    secrets = frozenset(
-        {
-            1001,
-            1002,
-            1003,
-            1004,
-            1005,
-            1006,
-            1007,
-            1008,
-            1009,
-        }
     )
     ```
 
@@ -200,6 +164,42 @@ These are differences that existed in the past. We have upstreamed them to
     ] = some_long_expression_causing_long_line
     ```
 
+*   Prefer not breaking lines between immediately nested brackets (see
+    [psf/black#1811](https://github.com/psf/black/issues/1811)). Example:
+
+    ```python
+    # Pyink:
+    secrets = frozenset({
+        1001,
+        1002,
+        1003,
+        1004,
+        1005,
+        1006,
+        1007,
+        1008,
+        1009,
+    })
+
+    # Black:
+    secrets = frozenset(
+        {
+            1001,
+            1002,
+            1003,
+            1004,
+            1005,
+            1006,
+            1007,
+            1008,
+            1009,
+        }
+    )
+    ```
+
+*   Support only formatting selected line ranges, using the `--pyink-lines=`
+    argument (see [psf/black#830](https://github.com/psf/black/issues/830)).
+
 # How do I use *Pyink*?
 
 Same as `black`, except you'll use `pyink`. All `black` command line options are
@@ -214,9 +214,6 @@ There are also a few *Pyink* only options:
                                   [default: pyink]
   --pyink-indentation [2|4]       The number of spaces used for indentation.
                                   [default: 4]
-  --pyink-lines START-END         Range of lines to format. Must be specified
-                                  as "START-END", index is 1-based and
-                                  inclusive on both ends.
   --pyink-use-majority-quotes     When normalizing string quotes, infer
                                   preferred quote style by calculating the
                                   majority in the file. Multi-line strings and
