@@ -6,6 +6,8 @@ All notable changes to Pyink are recorded here.
 
 * The CLI option `--pyink-lines` is now deprecated and replaced by _Black_'s
   built-in option `--line-ranges`.
+* Handle more trailing pragma cases so they are ignored for line-length
+  calculation.
 
 ## 23.10.0
 

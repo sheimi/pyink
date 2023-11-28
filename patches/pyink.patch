@@ -467,7 +467,7 @@
              or self.bracket_tracker.any_open_for_or_lambda()
          ):
              if self.is_comment:
-@@ -327,6 +347,20 @@ class Line:
+@@ -327,6 +347,29 @@ class Line:
  
          return False
  
@@ -475,9 +475,18 @@
 +        if not self.leaves:
 +            return 0
 +
-+        last_leaf = self.leaves[-1]
++        trailing_comments = self.comments.get(id(self.leaves[-1]), [])
++        if (
++            not trailing_comments
++            and len(self.leaves) > 1
++            and self.leaves[-1].type == token.RPAR
++            and not self.leaves[-1].value
++        ):
++            # When last leaf is an invisible paren, the trailing comment is
++            # attached to the leaf before.
++            trailing_comments = self.comments.get(id(self.leaves[-2]), [])
 +        length = 0
-+        for comment in self.comments.get(id(last_leaf), []):
++        for comment in trailing_comments:
 +            # str(comment) contains the whitespace preceding the `#`
 +            comment_str = str(comment)
 +            parts = _PRAGMA_REGEX.split(comment_str, maxsplit=1)
@@ -488,7 +497,7 @@
      def contains_multiline_strings(self) -> bool:
          return any(is_multiline_string(leaf) for leaf in self.leaves)
  
-@@ -479,7 +513,7 @@ class Line:
+@@ -479,7 +522,7 @@ class Line:
          if not self:
              return "\n"
  
@@ -497,7 +506,7 @@
          leaves = iter(self.leaves)
          first = next(leaves)
          res = f"{first.prefix}{indent}{first.value}"
-@@ -596,7 +630,7 @@ class EmptyLineTracker:
+@@ -596,7 +639,7 @@ class EmptyLineTracker:
  
      def _maybe_empty_lines(self, current_line: Line) -> Tuple[int, int]:
          max_allowed = 1
@@ -506,7 +515,7 @@
              max_allowed = 1 if self.mode.is_pyi else 2
          if current_line.leaves:
              # Consume the first leaf's extra newlines.
-@@ -611,7 +645,7 @@ class EmptyLineTracker:
+@@ -611,7 +654,7 @@ class EmptyLineTracker:
          depth = current_line.depth
  
          previous_def = None
@@ -515,7 +524,7 @@
              previous_def = self.previous_defs.pop()
  
          if previous_def is not None:
-@@ -660,10 +694,25 @@ class EmptyLineTracker:
+@@ -660,10 +703,25 @@ class EmptyLineTracker:
  
          if (
              self.previous_line
@@ -543,7 +552,7 @@
          ):
              return (before or 1), 0
  
-@@ -676,6 +725,14 @@ class EmptyLineTracker:
+@@ -676,6 +734,14 @@ class EmptyLineTracker:
                  return 0, 1
              return before, 1
  
@@ -558,7 +567,7 @@
          is_empty_first_line_ok = (
              Preview.allow_empty_first_line_before_new_block_or_comment
              in current_line.mode
-@@ -686,7 +743,7 @@ class EmptyLineTracker:
+@@ -686,7 +752,7 @@ class EmptyLineTracker:
                  or current_line.opens_block
                  # If it's a triple quote comment (but not at the start of a funcdef)
                  or (
@@ -567,7 +576,7 @@
                      and self.previous_line
                      and self.previous_line.leaves[0]
                      and self.previous_line.leaves[0].parent
-@@ -719,15 +776,16 @@ class EmptyLineTracker:
+@@ -719,15 +785,16 @@ class EmptyLineTracker:
  
              return 0, 0
  
@@ -587,7 +596,7 @@
              and before == 0
          ):
              slc = self.semantic_leading_comment
-@@ -744,9 +802,9 @@ class EmptyLineTracker:
+@@ -744,9 +811,9 @@ class EmptyLineTracker:
  
          if self.mode.is_pyi:
              if current_line.is_class or self.previous_line.is_class:
@@ -599,7 +608,7 @@
                      newlines = 1
                  elif current_line.is_stub_class and self.previous_line.is_stub_class:
                      # No blank line between classes with an empty body
-@@ -775,7 +833,7 @@ class EmptyLineTracker:
+@@ -775,7 +842,7 @@ class EmptyLineTracker:
                      # Blank line between a block of functions (maybe with preceding
                      # decorators) and a block of non-functions
                      newlines = 1
@@ -608,7 +617,7 @@
                  newlines = 1
              else:
                  newlines = 0
-@@ -843,10 +901,14 @@ def is_line_short_enough(  # noqa: C901
+@@ -843,10 +910,14 @@ def is_line_short_enough(  # noqa: C901
          line_str = line_to_string(line)
  
      width = str_width if mode.preview else len
@@ -624,7 +633,7 @@
              and "\n" not in line_str  # multiline strings
              and not line.contains_standalone_comments()
          )
-@@ -855,7 +917,7 @@ def is_line_short_enough(  # noqa: C901
+@@ -855,7 +926,7 @@ def is_line_short_enough(  # noqa: C901
          return False
      if "\n" not in line_str:
          # No multiline strings (MLS) present
@@ -633,7 +642,7 @@
  
      first, *_, last = line_str.split("\n")
      if width(first) > mode.line_length or width(last) > mode.line_length:
-@@ -1062,7 +1124,7 @@ def can_omit_invisible_parens(
+@@ -1062,7 +1133,7 @@ def can_omit_invisible_parens(
  def _can_omit_opening_paren(line: Line, *, first: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""
      remainder = False
@@ -642,7 +651,7 @@
      _index = -1
      for _index, leaf, leaf_length in line.enumerate_with_length():
          if leaf.type in CLOSING_BRACKETS and leaf.opening_bracket is first:
-@@ -1086,7 +1148,7 @@ def _can_omit_opening_paren(line: Line,
+@@ -1086,7 +1157,7 @@ def _can_omit_opening_paren(line: Line,
  
  def _can_omit_closing_paren(line: Line, *, last: Leaf, line_length: int) -> bool:
      """See `can_omit_invisible_parens`."""

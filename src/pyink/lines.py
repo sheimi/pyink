@@ -351,9 +351,18 @@ class Line:
         if not self.leaves:
             return 0
 
-        last_leaf = self.leaves[-1]
+        trailing_comments = self.comments.get(id(self.leaves[-1]), [])
+        if (
+            not trailing_comments
+            and len(self.leaves) > 1
+            and self.leaves[-1].type == token.RPAR
+            and not self.leaves[-1].value
+        ):
+            # When last leaf is an invisible paren, the trailing comment is
+            # attached to the leaf before.
+            trailing_comments = self.comments.get(id(self.leaves[-2]), [])
         length = 0
-        for comment in self.comments.get(id(last_leaf), []):
+        for comment in trailing_comments:
             # str(comment) contains the whitespace preceding the `#`
             comment_str = str(comment)
             parts = _PRAGMA_REGEX.split(comment_str, maxsplit=1)
