@@ -33,6 +33,7 @@ from pyink.nodes import (
     is_type_comment,
     is_type_ignore_comment,
     is_with_or_async_with_stmt,
+    make_simple_prefix,
     replace_child,
     syms,
     whitespace,
@@ -227,6 +228,11 @@ class Line:
         ):
             return True
         return False
+
+    @property
+    def is_chained_assignment(self) -> bool:
+        """Is the line a chained assignment"""
+        return [leaf.type for leaf in self.leaves].count(token.EQUAL) > 1
 
     @property
     def opens_block(self) -> bool:
@@ -563,12 +569,12 @@ class LinesBlock:
     before: int = 0
     content_lines: List[str] = field(default_factory=list)
     after: int = 0
+    form_feed: bool = False
 
     def all_lines(self) -> List[str]:
         empty_line = str(Line(mode=self.mode))
-        return (
-            [empty_line * self.before] + self.content_lines + [empty_line * self.after]
-        )
+        prefix = make_simple_prefix(self.before, self.form_feed, empty_line)
+        return [prefix] + self.content_lines + [empty_line * self.after]
 
 
 @dataclass
@@ -593,6 +599,12 @@ class EmptyLineTracker:
         This is for separating `def`, `async def` and `class` with extra empty
         lines (two on module-level).
         """
+        form_feed = (
+            Preview.allow_form_feeds in self.mode
+            and not current_line.depth
+            and bool(current_line.leaves)
+            and "\f\n" in current_line.leaves[0].prefix
+        )
         before, after = self._maybe_empty_lines(current_line)
         previous_after = self.previous_block.after if self.previous_block else 0
         before = (
@@ -618,6 +630,7 @@ class EmptyLineTracker:
             original_line=current_line,
             before=before,
             after=after,
+            form_feed=form_feed,
         )
 
         # Maintain the semantic_leading_comment state.
@@ -742,18 +755,14 @@ class EmptyLineTracker:
         ):
             return before, 0
 
+        # In preview mode, always allow blank lines, except right before a function
+        # docstring
         is_empty_first_line_ok = (
-            Preview.allow_empty_first_line_before_new_block_or_comment
-            in current_line.mode
+            Preview.allow_empty_first_line_in_block in current_line.mode
             and (
-                # If it's a standalone comment
-                current_line.leaves[0].type == STANDALONE_COMMENT
-                # If it opens a new block
-                or current_line.opens_block
-                # If it's a triple quote comment (but not at the start of a funcdef)
+                not is_docstring(current_line.leaves[0], is_pyink=self.mode.is_pyink)
                 or (
-                    is_docstring(current_line.leaves[0], is_pyink=self.mode.is_pyink)
-                    and self.previous_line
+                    self.previous_line
                     and self.previous_line.leaves[0]
                     and self.previous_line.leaves[0].parent
                     and not is_funcdef(self.previous_line.leaves[0].parent)
@@ -909,7 +918,7 @@ def is_line_short_enough(  # noqa: C901
     if not line_str:
         line_str = line_to_string(line)
 
-    width = str_width if mode.preview else len
+    width = str_width if Preview.respect_east_asian_width in mode else len
     if line.mode.is_pyink:
         effective_length = width(line_str) - line.trailing_pragma_comment_length()
     else:
