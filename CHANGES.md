@@ -4,7 +4,12 @@ All notable changes to Pyink are recorded here.
 
 ## Unreleased
 
-* Rebased to _Black_ v23.12.1.
+* Nothing notable unreleased.
+
+## 23.12.1
+
+This release is based on _Black_ v23.12.1.
+
 * The CLI option `--pyink-lines` is now deprecated and replaced by _Black_'s
   built-in option `--line-ranges`.
 * Handle more trailing pragma cases so they are ignored for line-length
